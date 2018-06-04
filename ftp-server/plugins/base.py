@@ -26,7 +26,7 @@ class Login(web.View):
     @aiohttp_jinja2.template('login.html')
     async def get(self):
         session = await get_session(self.request)
-        if 'uid' in session and int(time.time()) - gb.var['user_table'][session['uid']]['pass_time'] < 3600:
+        if 'uid' in session and 'uid' in gb.var['user_table'] and int(time.time()) - gb.var['user_table'][session['uid']]['pass_time'] < 3600:
             return web.Response(status=302, headers={'location': '/index'})
         else:
             return
