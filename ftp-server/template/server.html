@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+    <meta charset="UTF-8">
+    <title>Title</title>
+</head>
+<body>
+<div>
+    <div>
+        <div>新建用户</div>
+        <form action="{{ftp_client_name}}/add_user" method="post">
+            账户名：<input type="text" name="username" /><br>
+            密码：<input type="text" name="password" /><br>
+            <input type="radio" name="type" value="admin" />管理员
+            <input type="radio" name="type" value="user" />普通用户<br>
+            <input type="submit" />
+        </form>
+    </div>
+    <br>
+    <div>
+        <div>用户列表</div>
+        <div>
+        {% for name,pw in ftp_user_list %}
+        <li>{{name}}</li>
+        {% endfor %}
+        </div>
+        <div>项目详情</div>
+        <div style="font-family: Consolas,Monaco,monospace;">
+        {% for line in ftp_project_list %}
+        {{ line|safe }}<br>
+        {% endfor %}
+        </div>
+    </div>
+</div>
+</body>
+</html>

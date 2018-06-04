@@ -1,0 +1,52 @@
+﻿<!DOCTYPE html>
+<html lang="zh">
+<head>
+    <title>首页</title>
+</head>
+
+{% block head_js %}
+{% endblock %}
+<body>
+    <div>
+        Hello World!
+    </div>
+	<div>Online Client:</div>
+	<div>
+	{% for name in ftp_client.keys() %}
+	{% if ftp_client[name].status == "online" %}
+		<li><a href="server/{{name}}">{{name}}</a></li>
+	{% endif %}
+	{% endfor %}
+	</div>
+	<div>Offline Client:</div>
+	<div>
+	{% for name in ftp_client.keys() %}
+	{% if ftp_client[name].status == "offline" %}
+		<li>{{name}}</li>
+	{% endif %}
+	{% endfor %}
+	</div>
+	<div>Error Client:</div>
+	<div>
+	{% for name in ftp_client.keys() %}
+	{% if ftp_client[name].status == "error" %}
+		<li>{{name}}</li>
+	{% endif %}
+	{% endfor %}
+	</div>
+<br>
+	<div>Plugins</div>
+	<div>{% for name in plugin_table.keys() %}
+		<li {% if "introduction" in plugin_table[name] %}title="{{plugin_table[name].introduction}}"{% endif %}>
+		{% if plugin_table[name].url_enable %}
+		<a href="{{plugin_table[name].url}}">
+		{% endif %}
+			{{name}}
+		{% if plugin_table[name].url_enable %}
+		</a>
+		{% endif %}
+		</li>
+		{% endfor %}
+	</div>
+</body>
+</html>
