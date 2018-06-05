@@ -18,7 +18,7 @@ class Index(web.View):
     @gb.login_required
     @aiohttp_jinja2.template('index.html')
     async def get(self):
-        return {'userdata': self.request.app.userdata, 'ftp_client': gb.var['websocket_table'],
+        return {'userdata': self.request.app.userdata if 'userdata' in self.request.app else None, 'ftp_client': gb.var['websocket_table'],
                 'plugin_table': gb.plugin_table}
 
 @routes.view('/login')

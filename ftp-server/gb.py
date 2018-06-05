@@ -1,6 +1,6 @@
 import time
 from aiohttp import web
-from aiohttp_session import get_session
+from aiohttp_session import get_session, new_session
 from functools import wraps
 import asyncio
 import async_timeout
