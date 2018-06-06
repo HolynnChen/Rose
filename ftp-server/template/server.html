@@ -20,9 +20,11 @@
     <div>
         <div>用户列表</div>
         <div>
+            {% if len(ftp_user_list)>0 %}
         {% for name,pw in ftp_user_list %}
         <li>{{name}}</li>
         {% endfor %}
+            {% endif %}
         </div>
         <div>项目详情</div>
         <div style="font-family: Consolas,Monaco,monospace;">
