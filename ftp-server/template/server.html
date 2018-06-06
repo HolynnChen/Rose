@@ -20,7 +20,7 @@
     <div>
         <div>用户列表</div>
         <div>
-            {% if len(ftp_user_list)>0 %}
+            {% if ftp_user_list and not ftp_user_list==[] %}
         {% for name,pw in ftp_user_list %}
         <li>{{name}}</li>
         {% endfor %}
