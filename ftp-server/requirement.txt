@@ -2,6 +2,6 @@ cryptography
 aiohttp
 aiohttp_session
 asyncio
-asyncio_timeout
+async_timeout
 aiohttp_jinja2
 jinja2
