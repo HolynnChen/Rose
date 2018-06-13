@@ -9,11 +9,11 @@ from aiohttp_session import get_session
 
 routes = gb.var['routes']
 
-@routes.get('/')
+@gb.pack('/','get')
 async def ret(request):
     return web.Response(status=302, headers={'location': '/index'})
 
-@routes.view('/index')
+@gb.pack('/index','view')
 class Index(web.View):
     @gb.login_required
     @aiohttp_jinja2.template('index.html')
@@ -21,7 +21,7 @@ class Index(web.View):
         return {'userdata': self.request.app.userdata if 'userdata' in self.request.app else None, 'ftp_client': gb.var['websocket_table'],
                 'plugin_table': gb.plugin_table}
 
-@routes.view('/login')
+@gb.pack('/login','view')
 class Login(web.View):
     @aiohttp_jinja2.template('login.html')
     async def get(self):
@@ -43,7 +43,7 @@ class Login(web.View):
         else:
             return web.Response(status=302, headers={'location': '/login'})
 
-@routes.view('/server/{name}')
+@gb.pack('/server/{name}','view')
 class server(web.View):
     @gb.login_required
     @aiohttp_jinja2.template('server.html')
@@ -57,7 +57,7 @@ class server(web.View):
         json2=await gb.receive_json(s2)
         return {'ftp_client': gb.var['websocket_table'][name], 'ftp_client_name': name,'ftp_user_list':json1['data']['data'],'ftp_project_list':[i.replace(' ','&nbsp;') for i in json2['data']['data'].splitlines()]}
 
-@routes.post('/server/{name}/{func}')
+@gb.pack('/server/{name}/{func}','post')
 async def server_function(request):
     name = request.match_info['name']
     func = request.match_info['func']
@@ -73,9 +73,23 @@ async def server_function(request):
         data=await gb.receive_json(s)
         if data:return web.Response(status=302,headers={'location':f'/server/{name}'})#return web.json_response(data)
         else:return web.Response(status=302, headers={'location': '/server/index'})
+    elif func=='change_quota':
+        command,args=None,None
+        if data['type']=='add' and 'name' in data and 'id' in data:
+            command='add_project'
+            args=[data['name'],data['id']]
+        if data['type']=='change' and 'size' in data and 'id' in data:
+            command='change_limit'
+            args=[data['size'],data['id']]
+        if not command: return web.Response(status=302, headers={'location': f'/server/{name}'})
+        s=await gb.send_msg(name,{'command':command,'mod_name':'command','args':args})
+        data=await gb.receive_json(s)
+        if data:return web.Response(status=302,headers={'location':f'/server/{name}'})#return web.json_response(data)
+        else:return web.Response(status=302, headers={'location': '/server/index'})
+
     return web.Response(status=302, headers={'location': '/index'})
 
-@routes.get('/ws')
+@gb.pack('/ws','get')
 async def webscoket(request):
     ws = web.WebSocketResponse(heartbeat=30, receive_timeout=60)
     await ws.prepare(request)
@@ -104,6 +118,4 @@ async def webscoket(request):
         print('error', name)
         return ws
 
-
-gb.update('routes', routes)
-gb.plugin_table["基础"] = {'introduction': '集成首页、登陆与基本ftp-client管理功能的模块', 'url_enable': False}
+gb.plugin_table["基础"] = {'introduction': '集成首页、登陆与基本ftp-client管理功能的模块', 'url_enable': False,'version':'1.0.0'}

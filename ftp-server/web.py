@@ -1,4 +1,3 @@
-#This is the main file to run
 import asyncio
 import gb
 import configloader as co

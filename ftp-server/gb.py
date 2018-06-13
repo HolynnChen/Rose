@@ -10,6 +10,7 @@ plugin_table={}
 def init():
     global var
     var['routes']=web.RouteTableDef()
+    var['routes_temp']=[]
     var['websocket_table']={}
     var['user']={}
     var['user_table']={}
@@ -52,3 +53,32 @@ async def receive_json(s,timeout=5):
             return json
     except (asyncio.TimeoutError,asyncio.CancelledError):
         return False
+
+def pack(url,method):
+    routes = var['routes']
+    if url in var['routes_temp']:raise ValueError
+    else:var['routes_temp'].append(url)
+    if method=='get':
+        def pack_get(func):
+            @wraps(func)
+            @routes.get(url)
+            async def inner(cls, *args, **kwargs):return await func(cls, *args, **kwargs)
+            update('routes',routes)
+            return inner
+        return pack_get
+    elif method=='post':
+        def pack_post(func):
+            @wraps(func)
+            @routes.post(url)
+            async def inner(cls, *args, **kwargs):return await func(cls, *args, **kwargs)
+            update('routes',routes)
+            return inner
+        return pack_post
+    elif method=='view':
+        def pack_view(func):
+            @wraps(func)
+            @routes.view(url)
+            async def inner(cls, *args, **kwargs):return await func(cls, *args, **kwargs)
+            update('routes',routes)
+            return inner
+        return pack_view
