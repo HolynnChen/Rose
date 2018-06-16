@@ -1,0 +1,23 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+    <meta charset="UTF-8">
+    <title>Title</title>
+</head>
+<body>
+<div>Plugins</div>
+	<div>{% for name in plugin_table.keys() %}
+		<li {% if "introduction" in plugin_table[name] %}title="{{plugin_table[name].introduction}}"{% endif %}>
+		{% if plugin_table[name].url_enable %}
+		<a href="{{plugin_table[name].url}}">
+		{% endif %}
+			{{name}}
+		{% if plugin_table[name].url_enable %}
+		</a>
+		{% endif %}
+		</li>
+		{% endfor %}
+	</div>
+</body>
+</body>
+</html>

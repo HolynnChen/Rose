@@ -8,6 +8,7 @@ from aiohttp import web
 from aiohttp_session import setup
 from aiohttp_session.cookie_storage import EncryptedCookieStorage
 import aiohttp_jinja2,jinja2
+import configloader as co
 for root, dirs, files in os.walk('plugins'):
     for i in files:
         if not i=='__init__.py':__import__('plugins.'+i.split('.')[0])
@@ -24,4 +25,5 @@ def init():
     aiohttp_jinja2.setup(app, loader=jinja2.FileSystemLoader(TEMPLATE_DIR))
     app.router.add_static('/static/', path=STATIC_DIR, name='static')
     app.router.add_routes(routes)
+    app.add_routes([web.get('/',lambda request:web.Response(status=302, headers={'location': '/admin/login' if 'index' not in co.config else co.config['index']}))])
     return app

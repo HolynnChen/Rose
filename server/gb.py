@@ -19,7 +19,7 @@ def init():
 def update(key,value):
     var[key]=value
 
-def login_required(func):  # 用户登录状态校验
+def admin_login_required(func):  # 用户登录状态校验 该子程序仅用于示例，若您需要使用用户登录校验请自行复制到模块开头或进行修改
     @wraps(func)
     async def inner(cls, *args, **kwargs):
         session = await get_session(cls.request)
@@ -31,7 +31,7 @@ def login_required(func):  # 用户登录状态校验
             return await func(cls, *args, **kwargs)
         else:
             if uid and uid in var['user_table']:del var['user_table'][uid]
-            return web.Response(status=302, headers={'location': '/login'})
+            return web.Response(status=302, headers={'location': '/admin/login'})
 
     return inner
 def random_string():
