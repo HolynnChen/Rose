@@ -3,11 +3,14 @@
 <script src="//unpkg.com/vue/dist/vue.js"></script>
 <script src="//unpkg.com/element-ui/lib/index.js"></script>
 <script src="//unpkg.com/jquery/dist/jquery.js"></script>
+<script src="//unpkg.com/axios/dist/axios.min.js"></script>
+<script src="/static/js/project_main.js"></script>
 <link rel="stylesheet" type="text/css" href="//unpkg.com/element-ui/lib/theme-chalk/index.css">
 <div id="app">
     <el-container>
         <el-header>管理员登录入口</el-header>
         <el-main>
+            <img src="/static/img/logo.png">
             <el-form ref="form" :model="form" label-width="80px" size="medium">
                 <el-col>
                     <el-form-item label="用户名">
@@ -28,12 +31,6 @@
         </el-main>
     </el-container>
 </div>
-<!--
-<form method="post">
-<input type="text" name="user"/>
-<input type="text" name="password">
-<input type="submit">
-</form>-->
 <style>
     html,body,#app,.el-container{height: 100%;margin:0px;}
     .el-header, .el-footer {
@@ -58,21 +55,43 @@
         width:20%;
         margin:auto;
     }
+    .el-form-item__content,.el-button{
+        margin-right: 10%;
+    }
 </style>
 <script>
-    new Vue({data(){
+    new Vue({
+        el:'#app',
+        data(){
             return {form:{user:'',password:''}}
         },
         methods:{
             onSubmit(){
                 //alert(this.form.name+' '+this.form.password)
-                $.ajax({
-                    type:'POST',
-                    url:location.href,
-                    data:{user:this.form.user,password:this.form.password},
-                    success:(data)=>{console.log(data)}
-                })
+                axios.post(location.href,jq({
+                        user:this.form.user,
+                        password:this.form.password
+                    })).then((respone_msg)=>{
+                        let data=respone_msg.data;
+                        switch (data.code){
+                            case 302:
+                                window.location.href=data.data.url;
+                                break;
+                            case 10001:
+                                this.$alert('账户或密码有误，请确认后重新输入!','登陆错误',{
+                                    confirmButtonText:'知道了',
+                                });
+                                break;
+                            default:
+                                this.$notify({
+                                    title:'警告',
+                                    message:'发生了未知错误，无法登陆',
+                                    type:'warning'
+                                });
+                                break;
+                        }
+                });
             }
-        }}).$mount('#app')
+        }})
 </script>
 </html>

@@ -5,6 +5,7 @@ from functools import wraps
 import asyncio
 import async_timeout
 import random,string
+
 var={}
 plugin_table={}
 def init():
@@ -18,6 +19,18 @@ def init():
 
 def update(key,value):
     var[key]=value
+async def worker():
+    var['worklist']=asyncio.Queue()
+    while True:
+        work=await var['worklist'].get()
+        await work()
+
+async def put_work(func):
+    if str(type(func)).split("'")[1]=='list':
+        for i in func:
+            await var['worklist'].put_nowait(i)
+        return
+    await var['worklist'].put_nowait(func)
 
 def admin_login_required(func):  # 用户登录状态校验 该子程序仅用于示例，若您需要使用用户登录校验请自行复制到模块开头或进行修改
     @wraps(func)
@@ -82,3 +95,18 @@ def pack(url,method):
             update('routes',routes)
             return inner
         return pack_view
+
+def expect(json,keyword):
+    for i in keyword:
+        if i not in json:
+            return False
+    return True
+
+errorcode={
+    10000:{'code':10000,'msg':'login fail','data':''},
+    10001:{'code':10001,'msg':'login fail','data':''},
+    12000:{'code':12000,'msg':'decrypt error','data':''}
+}
+
+def efc(code):
+    return web.json_response(errorcode[code])#error from code

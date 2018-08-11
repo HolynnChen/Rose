@@ -14,7 +14,7 @@
 	<div>
 	{% for name in ftp_client.keys() %}
 	{% if ftp_client[name].status == "online" %}
-		<li><a href="server/{{name}}">{{name}}</a></li>
+		<li><a href="server/{{{name}}}">{{name}}</a></li>
 	{% endif %}
 	{% endfor %}
 	</div>
@@ -22,7 +22,7 @@
 	<div>
 	{% for name in ftp_client.keys() %}
 	{% if ftp_client[name].status == "offline" %}
-		<li>{{name}}</li>
+		<li>{{{name}}}</li>
 	{% endif %}
 	{% endfor %}
 	</div>
@@ -30,7 +30,7 @@
 	<div>
 	{% for name in ftp_client.keys() %}
 	{% if ftp_client[name].status == "error" %}
-		<li>{{name}}</li>
+		<li>{{{name}}}</li>
 	{% endif %}
 	{% endfor %}
 	</div>
@@ -41,7 +41,7 @@
 		{% if plugin_table[name].url_enable %}
 		<a href="{{plugin_table[name].url}}">
 		{% endif %}
-			{{name}}
+			{{{name}}}
 		{% if plugin_table[name].url_enable %}
 		</a>
 		{% endif %}

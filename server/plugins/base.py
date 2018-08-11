@@ -1,14 +1,14 @@
-import gb
+import rose.gb as gb
+import rose.configloader as co
 from aiohttp import web
 import asyncio
 import aiohttp_jinja2
 import aiohttp
 from functools import wraps
-import configloader as co
 import time
 from aiohttp_session import get_session
 
-gb.plugin_table["基础"] = {'introduction': '集成首页、登陆与基本ftp-client管理功能的模块', 'url_enable': True,'url':'../base','version':'1.0.0'}
+gb.plugin_table["基础"] = {'introduction': '集成首页、登陆与基本ftp-client管理功能的模块', 'url_enable': True,'url':'Base','version':'1.0.0','name':'base'}
 
 def login_required(func):
     @wraps(func)
