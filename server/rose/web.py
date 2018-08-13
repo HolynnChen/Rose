@@ -16,6 +16,7 @@ gb.init()
 from aiohttp import web
 from aiohttp.web import middleware
 from threading import Thread
+import aiohttp_debugtoolbar
 
 for root, dirs, files in os.walk('plugins'):
     for i in files:
@@ -42,6 +43,9 @@ def init():
     app.router.add_static('/static/', path=STATIC_DIR, name='static')
     app.router.add_routes(routes)
     app.add_routes([web.get('/',lambda request:web.Response(status=302, headers={'location': '/admin/login' if 'index' not in co.config else co.config['index']}))])
+    print(gb.var['global_route'].routes)
+    aiohttp_debugtoolbar.setup(app)
+    app.add_routes(gb.var['global_route'].routes)
     return app
 
 def keep_worker():
@@ -50,3 +54,4 @@ def keep_worker():
 def server_start():
     Thread(target=keep_worker).start()
     web.run_app(init(),port=co.config['port'] if 'port' in co.config else 8080)
+
