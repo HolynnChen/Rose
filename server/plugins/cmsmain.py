@@ -15,7 +15,7 @@ class cms_service:
 
 class cms:
     def __init__(self):
-        print('running')
+        print('cms running')
         return
     async def hello_get(self,request):
         temp= request.reqDic.get('what')

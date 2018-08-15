@@ -23,9 +23,36 @@ def update(key,value):
 async def worker():
     var['worklist']=asyncio.Queue()
     print('start worker list')
+    getType=lambda x:str(type(x)).split("'")[1]
     while True:
         work=await var['worklist'].get()
-        await work()
+        t=getType(work)
+        if t=='function':
+            await work()
+            return
+        elif t in ('tuple','list'):
+            if len(work)==2:
+                await work[0](work[1])
+            elif len(work)==3:
+                if not getType(work[2])=='function':raise ValueError
+                await work[2](await work[0](work[1]))
+            else:raise ValueError
+        elif t=='dict':
+            temp=None
+            if 'func' not in work:raise ValueError
+            if 'args' in work:
+                if 'unpack_params' in work and work['unpack_params']==True:
+                    if getType(work['arg']) in ('tuple','list'):temp= await work['func'](*work['args'])
+                    elif getType(work['arg'])=='dict':temp= await work['func'](**work['args'])
+                    else: temp= await work['func'](work['args'])
+                else:temp= await work['func'](work['args'])
+            if 'recv' in work:
+                if 'unpack_output' in work and work['unpack_output']==True:
+                    if getType(temp) in ('tuple','list'):await work['recv'](*temp)
+                    elif getType(temp)=='dict':temp= await work['recv'](**temp)
+                    return
+                await work['recv'](temp)
+
 
 async def put_work(func):
     if str(type(func)).split("'")[1]=='list':
