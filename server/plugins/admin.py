@@ -30,7 +30,7 @@ async def ret(request):
 
 @gb.pack('/admin/index','view')
 class Admin(web.View):
-    #@admin_login_required
+    @admin_login_required
     @aiohttp_jinja2.template('/admin/index.html')
     async def get(self):
         temp=[]
@@ -39,7 +39,7 @@ class Admin(web.View):
         return {'enable_plugin':temp}
 @gb.pack('/admin/app','view')
 class Adminapps(web.View):
-    #@admin_login_required
+    @admin_login_required
     async def post(self):
         data=await self.request.post()
         if not gb.expect(data,['app','data']):return gb.efc(10000)

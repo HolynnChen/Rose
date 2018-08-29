@@ -17,9 +17,16 @@ def init():
     var['user_table']={}
     var['websocket_respone_table']={}
     var['global_route']=route()
+    var['templateFuncClassDic']={}
+    __add_class_func_to_local__(var["global_route"], ['addClass', 'add_rewrite_rule'])
 
 def update(key,value):
     var[key]=value
+'''
+暴露函数声明区
+'''
+global addClass,add_rewrite_rule
+
 async def worker():
     var['worklist']=asyncio.Queue()
     print('start worker list')
@@ -142,24 +149,44 @@ def efc(code):
 
 class route:
     def __init__(self):
+        self.ic=0
         self.routes=[]
         self.rule=[]
         self.__routeDic=['get','post']
         self.__rewriteMethods=['replace_start',]
         self.obj={}
+        self.variableRoutes={}
+        self.regUrls=[]
+        self.getRandom=lambda :''.join(random.sample(string.ascii_letters + string.digits, 8))+'_'+self.getic()
+    def getic(self):
+        self.ic+=1
+        return str(self.ic)
     def addClass(self,controllerClass,parentClassName='')->None:#应当能够匹配多层嵌套的class
-        className=controllerClass.__name__
-        self.obj[className]=controllerClass()
-        for i in filter(lambda x:not x.startswith('__') and not x.startswith('_'),dir(self.obj[className])):
-            if str(type(i)).split("'")[1]=='class':
-                self.addClass(i,f'/{className}' if not parentClassName else f'{parentClassName}/{className}')
+        if len(self.regUrls)==0:self.regUrls=list(map(lambda x:(x.path,x.method),var['routes']._items))
+        className=controllerClass.__alias__ if '__alias__' in dir(controllerClass) and str(type(controllerClass.__alias__)).split("'")[1]=='str' else controllerClass.__name__
+        route_variable_name=None
+        if className=="variable":
+            route_variable_name=self.getRandom() if "__variable_name__" not in dir(controllerClass) else controllerClass.__variable_name__
+            className='{'+route_variable_name+'}'
+        theRandom=self.getRandom()
+        self.obj[theRandom+className]=controllerClass()
+        easy=self.obj[theRandom+className]
+        for i in filter(lambda x:not x.startswith('__') and not x.startswith('_'),dir(easy)):
+            theType=str(type(getattr(easy,i))).split("'")[1]
+            if theType=='type':
+                self.addClass(getattr(easy,i),f'/{className}' if not parentClassName else f'{parentClassName}/{className}')
                 continue
-            elif not not str(type(i)).split("'")[1]=="function":
+            elif not theType in ["function","method"]:
                 continue
             for j in self.__routeDic:
                 if i.endswith(f'_{j}'):
-                    self.routes.append(getattr(web,j)(self.route_rewrite(i[:-len(f'_{j}')],className,parentClassName),self.wrap(getattr(self.obj[className],i),self.obj[className])))
-                    #self.routes.append(getattr(web,j)(self.route_rewrite(i[:-len(f'_{j}')],className,parentClassName),getattr(self.obj[className],i)))
+                    name=i[:-len(f'_{j}')]
+                    if name=='variable':name='{variable}'
+                    elif name=="default":name=''
+                    url=self.route_rewrite(name,className,parentClassName)
+                    if len(list(filter(lambda m:m[0]==url and (m[1]==j or m[1]=='*'),self.regUrls))):raise ValueError
+                    self.regUrls.append((url,j))
+                    self.routes.append(getattr(web,j)(url,self.wrap(getattr(easy,i),easy)))
                     break
 
         return
@@ -188,6 +215,23 @@ class route:
                     k=i.split('=')
                     if len(k)==2:temp[k[0]]=k[1]
             request.reqDic=temp
-            return await func(request)
+            if func.__name__=='variable':request.variable=request.match_info['variable']
+            try:
+                return await func(request)
+            except Exception as e:
+                print(e)
+                return web.Response(text="抱歉，您所访问的应用出错了")
+
         inner.__name__=func.__name__#进行名字修复
         return inner
+def __add_class_func_to_local__(obj:"传入的参数建议为实例化类",func_list:"需要添加到global的方法名称数组"):
+    temp=dir(obj)
+    for i in func_list:
+        if i in temp and str(type(getattr(obj,i))).split("'")[1] in ["function","method"]:
+            #if i in globals():raise NameError
+            globals()[i]=getattr(obj,i)
+
+def addTemplateFuncClass(obj):
+    if not str(type(obj)).split("'")[1] == "type":raise ValueError
+    if obj.__name__ in var['templateFuncClassDic']:raise NameError
+    var['templateFuncClassDic'][obj.__name__]=obj()

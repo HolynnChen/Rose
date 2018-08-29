@@ -39,19 +39,22 @@ def init():
     secret_key='This is the default secret_key'
     secret_key=hashlib.md5(base64.b64encode(secret_key.encode())).hexdigest().encode()
     setup(app, EncryptedCookieStorage(secret_key))
+
     aiohttp_jinja2.setup(app, loader=jinja2.FileSystemLoader(TEMPLATE_DIR),variable_start_string='{{{',variable_end_string='}}}')
     app.router.add_static('/static/', path=STATIC_DIR, name='static')
     app.router.add_routes(routes)
-    app.add_routes([web.get('/',lambda request:web.Response(status=302, headers={'location': '/admin/login' if 'index' not in co.config else co.config['index']}))])
+    #app.add_routes([web.get('/',lambda request:web.Response(status=302, headers={'location': '/admin/login' if 'index' not in co.config else co.config['index']}))])
+    aiohttp_jinja2.get_env(app).globals.update(gb.var['templateFuncClassDic'])
     print(gb.var['global_route'].routes)
-    aiohttp_debugtoolbar.setup(app)
     app.add_routes(gb.var['global_route'].routes)
     return app
 
 def keep_worker():
     loop = asyncio.new_event_loop()
     loop.run_until_complete(gb.worker())
-def server_start():
+def server_start(devmode=False):
     Thread(target=keep_worker).start()
-    web.run_app(init(),port=co.config['port'] if 'port' in co.config else 8080)
+    app=init()
+    if devmode:aiohttp_debugtoolbar.setup(app)
+    web.run_app(app,port=co.config['port'] if 'port' in co.config else 8080)
 

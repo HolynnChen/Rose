@@ -1,6 +1,5 @@
-import rose.configloader
-import rose.web
+from rose import *
 if __name__== '__main__':
-    rose.configloader.init()
-    rose.web.server_start()
+    configloader.init()
+    web.server_start()
 
