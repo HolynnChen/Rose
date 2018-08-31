@@ -1,4 +1,5 @@
 import configparser as co
+import toml
 
 config = None
 
@@ -12,17 +13,12 @@ class myconfig(co.ConfigParser):
 
 
 def init():
-    global config
-    config = myconfig()
+    global raw_config,config
+    '''config = myconfig()
     config.read('config.ini')
-    chose('default')
+    chose('default')'''
+    with open('config.ini') as f:
+        raw_config=toml.load(f)
+        config=raw_config['default']
 
 
-def chose(sec):
-    global config
-    if sec not in config.sections():
-        raise Exception('不存在的配置项')
-    temp = {}
-    for (a, b) in config.items(sec):
-        temp[a] = b
-    config = temp

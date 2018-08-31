@@ -18,6 +18,7 @@ import motor.motor_asyncio
 from Cryptodome.PublicKey import RSA
 from Cryptodome.Cipher import PKCS1_OAEP
 import base64
+from pymongo import ReturnDocument,ASCENDING,DESCENDING
 
 #-----BEGIN PUBLIC KEY-----
 #MIGfMA0GCSqGSIb3DQEBAQUAA4GNADCBiQKBgQDTHDl9GNx0l1qOiNQQDXvwk2dY
@@ -167,4 +168,18 @@ class MongoConnect:
         self.d=self.c['cmsmongo']
         self.d.insert_one({'config':{},'model':{}})
         #之后这里是各种初始化、环境配置等
-
+    async def getNextID(self,name):
+        counter=await self.d['counter'].find_one_and_update({'_id':name},{'$inc':{'seq':1}},projection={'seq':True,'_id':False},upsert=True,return_document=ReturnDocument.AFTER)
+        return counter['seq']
+    async def getCount(self,CollectionName,filter={}):
+        return await self.d[CollectionName].count_documents(filter=filter)
+    async def getPage(self,CollectionName,startID=0,startPage=1,wantPage=1,limit=20,otherCondition={}):
+        next=wantPage>=startPage
+        query='$gte' if next else '$lt'
+        cusor=self.d[CollectionName].find(filter={query:{'ID':startID}.update(otherCondition)},sort=[{"ID":DESCENDING if next else ASCENDING}],skip=(wantPage-startPage)*limit if startPage-wantPage>=0 else (startPage-wantPage-1)*limit)
+        result=await cusor.to_list()
+        if next:return result
+        else:return result[::-1]
+    async def getLast(self,CollectionName,limit=20):
+        cusor=self.d[CollectionName].find(sort=[{"ID":-1}],limit=limit)
+        return await cusor.to_list()

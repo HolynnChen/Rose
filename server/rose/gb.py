@@ -224,11 +224,11 @@ class route:
 
         inner.__name__=func.__name__#进行名字修复
         return inner
-def __add_class_func_to_local__(obj:"传入的参数建议为实例化类",func_list:"需要添加到global的方法名称数组"):
+def __add_class_func_to_local__(obj,func_list):
     temp=dir(obj)
     for i in func_list:
         if i in temp and str(type(getattr(obj,i))).split("'")[1] in ["function","method"]:
-            #if i in globals():raise NameError
+            if i in globals():raise NameError
             globals()[i]=getattr(obj,i)
 
 def addTemplateFuncClass(obj):

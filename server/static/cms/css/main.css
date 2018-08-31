@@ -21,19 +21,25 @@ html{
 body{
     width: 100%;
     height: 100%;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
 }
 .header{
     height: 80px;
     width: 100%;
-    position: absolute;
+    position: fixed;
     display: flex;
     justify-content: center;
+    z-index: 2;
+    background-color: rgba(0,0,0,0.15);
 }
 .header_main{
     height: 100%;
     width: 1200px;
     display: flex;
     align-items: center;
+    justify-content: space-between;
 }
 .header_logo{
     background-image: url('../img/logo.png');
@@ -43,29 +49,70 @@ body{
     width: 60px;
     margin-left: 10px
 }
+.header_block{
+    height: 80px;
+    width: 120px;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+}
+.header_block p{
+    font-weight: bold;
+    font-size: 16px;
+    color:#fff;
+}
+.header_links_container{
+    display: flex;
+    margin-right: 20px;
+}
 .slider{
     width: 100%;
-    height: calc(100vh);
+    height: 100vh;
     transition: all 1s;
     background-image: url('../img/background01.jpg');
     background-size: cover;
     background-position: center;
     background-attachment: fixed;
     display: flex;
-    flex-direction: column;
     justify-content: center;
     align-items: center;
     position: relative;
+}
+.slider_center{
+    display: flex;
+}
+.slider_title,.slider_hidden_box{
+    height: 300px;
+    width: 300px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    border: 3px solid #fff;
+    border-radius: 50%;
+    transition: all 0.5s;
+}
+.slider_hidden_box{
+    transform: rotateY(-90deg);
+    position: absolute;
 }
 .slider_title_main{
     font-size: 36px;
     font-weight: bold;
     color:#fff;
 }
+.slider_center:hover .slider_title{
+    transform: rotateY(90deg);
+}
+.slider_center:hover .slider_hidden_box{
+    transform: rotateY(0deg);
+}
 .slider_title_little{
     font-size: 16px;
     color:#fff;
-    text-align: right
+    text-align: right;
+    align-self: flex-end;
+    margin-right: 30px;
 }
 .slider_hidden{
     width: 60px;
@@ -76,7 +123,16 @@ body{
     bottom: 0px;
     animation: jump_arrow 2.5s infinite
 }
-
+.body{
+    display: flex;
+    justify-content: center;
+    height: 1200px;
+}
+.body_contain{
+    display: flex;
+    width: 1200px;
+    height: 100%;
+}
 /*动画区*/
 @keyframes jump_arrow{
     0%{
