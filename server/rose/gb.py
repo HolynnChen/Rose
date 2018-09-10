@@ -2,6 +2,7 @@ import time
 from aiohttp import web
 from aiohttp_session import get_session, new_session
 from functools import wraps
+from functools import update_wrapper
 import asyncio
 import async_timeout
 import random,string
@@ -18,6 +19,7 @@ def init():
     var['websocket_respone_table']={}
     var['global_route']=route()
     var['templateFuncClassDic']={}
+    var['init']=[]
     __add_class_func_to_local__(var["global_route"], ['addClass', 'add_rewrite_rule'])
 
 def update(key,value):
@@ -163,7 +165,7 @@ class route:
         return str(self.ic)
     def addClass(self,controllerClass,parentClassName='')->None:#应当能够匹配多层嵌套的class
         if len(self.regUrls)==0:self.regUrls=list(map(lambda x:(x.path,x.method),var['routes']._items))
-        className=controllerClass.__alias__ if '__alias__' in dir(controllerClass) and str(type(controllerClass.__alias__)).split("'")[1]=='str' else controllerClass.__name__
+        className=controllerClass.__alias__ if '__alias__' in dir(controllerClass) and type(controllerClass.__alias__).__name__=='str' else controllerClass.__name__
         route_variable_name=None
         if className=="variable":
             route_variable_name=self.getRandom() if "__variable_name__" not in dir(controllerClass) else controllerClass.__variable_name__
@@ -172,7 +174,7 @@ class route:
         self.obj[theRandom+className]=controllerClass()
         easy=self.obj[theRandom+className]
         for i in filter(lambda x:not x.startswith('__') and not x.startswith('_'),dir(easy)):
-            theType=str(type(getattr(easy,i))).split("'")[1]
+            theType=type(getattr(easy,i)).__name__
             if theType=='type':
                 self.addClass(getattr(easy,i),f'/{className}' if not parentClassName else f'{parentClassName}/{className}')
                 continue
@@ -198,7 +200,7 @@ class route:
         return temp
     def add_rewrite_rule(self,tmp):
         for i in tmp:
-            if not str(type(i)).split("'")[1]== 'str' or not len(tmp)==3:
+            if not type(i).__name__== 'str' or not len(tmp)==3:
                 raise ValueError
         if tmp[0] not in self.__rewriteMethods:
             raise ValueError
@@ -216,22 +218,23 @@ class route:
                     if len(k)==2:temp[k[0]]=k[1]
             request.reqDic=temp
             if func.__name__=='variable':request.variable=request.match_info['variable']
-            try:
-                return await func(request)
-            except Exception as e:
-                print(e)
-                return web.Response(text="抱歉，您所访问的应用出错了")
+            #try:
+            #    return await func(request)
+            #except Exception as e:
+            #    print(e)
+            #    return web.Response(text="抱歉，您所访问的应用出错了")
+            return await func(request)
 
         inner.__name__=func.__name__#进行名字修复
         return inner
 def __add_class_func_to_local__(obj,func_list):
     temp=dir(obj)
     for i in func_list:
-        if i in temp and str(type(getattr(obj,i))).split("'")[1] in ["function","method"]:
+        if i in temp and type(getattr(obj,i)).__name__ in ["function","method"]:
             if i in globals():raise NameError
             globals()[i]=getattr(obj,i)
 
-def addTemplateFuncClass(obj):
-    if not str(type(obj)).split("'")[1] == "type":raise ValueError
+def addTemplateFuncClass(obj,static=False):
+    if not type(obj).__name__ == "type":raise ValueError
     if obj.__name__ in var['templateFuncClassDic']:raise NameError
-    var['templateFuncClassDic'][obj.__name__]=obj()
+    var['templateFuncClassDic'][obj.__name__]=(obj() if not static else obj)

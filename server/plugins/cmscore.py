@@ -15,6 +15,7 @@ import asyncio
 import json
 import motor
 import motor.motor_asyncio
+import aiomysql
 from Cryptodome.PublicKey import RSA
 from Cryptodome.Cipher import PKCS1_OAEP
 import base64
@@ -71,7 +72,8 @@ def login_required(func):  # 用户登录状态校验
 
 class Cms:
     def __init__(self):
-        self._m=MongoConnect()
+        #self._m=MongoConnect()
+        self._m=MysqlConnect()
         self._r=RedisConnect()
     async def getuser(self,id=None,name=None,special_rule=None):
         if id:
@@ -158,16 +160,18 @@ class RedisConnect:
 class MongoConnect:
     def __init__(self,host='localhost',port=27017):
         self.c=motor.motor_asyncio.AsyncIOMotorClient('localhost', 27017)
-        if 'cmsmongo' not in self.c.database_name():
-            self._newinit_()
-        else:
-            self.d=self.c['cmsmongo']
+        #if 'cmsmongo' not in self.c.list_database_names():
+        #    self._newinit_()
+        #else:
+        #    self.d=self.c['cmsmongo']
+        self.d=self.c['cmsmongo']
 
     def _newinit_(self):
         #创建表,默认取cmsmongo，后加个vue来改初始化内容
         self.d=self.c['cmsmongo']
         self.d.insert_one({'config':{},'model':{}})
         #之后这里是各种初始化、环境配置等
+
     async def getNextID(self,name):
         counter=await self.d['counter'].find_one_and_update({'_id':name},{'$inc':{'seq':1}},projection={'seq':True,'_id':False},upsert=True,return_document=ReturnDocument.AFTER)
         return counter['seq']
@@ -176,10 +180,102 @@ class MongoConnect:
     async def getPage(self,CollectionName,startID=0,startPage=1,wantPage=1,limit=20,otherCondition={}):
         next=wantPage>=startPage
         query='$gte' if next else '$lt'
-        cusor=self.d[CollectionName].find(filter={query:{'ID':startID}.update(otherCondition)},sort=[{"ID":DESCENDING if next else ASCENDING}],skip=(wantPage-startPage)*limit if startPage-wantPage>=0 else (startPage-wantPage-1)*limit)
-        result=await cusor.to_list()
+        cusor=self.d[CollectionName].find({'ID':{query:startID}}.update(otherCondition),sort=[("ID",DESCENDING if next else ASCENDING)],skip=(wantPage-startPage)*limit if startPage-wantPage>=0 else (startPage-wantPage-1)*limit)
+        result=await cusor.to_list(length=limit)
         if next:return result
         else:return result[::-1]
     async def getLast(self,CollectionName,limit=20):
-        cusor=self.d[CollectionName].find(sort=[{"ID":-1}],limit=limit)
-        return await cusor.to_list()
+        cusor=self.d[CollectionName].find(sort=[{"ID":DESCENDING}],limit=limit)
+        return await cusor.to_list(length=limit)
+
+class MysqlConnect:
+    def __init__(self,host='localhost',port=3306,user='root',password='123456',db='RoseCMS'):
+        self.p=aiomysql.create_pool(host=host,port=port,user=user,password=password,db=db)
+        asyncio.ensure_future(self.init())
+    async def init(self):
+        self.p=await self.p
+    async def getCount(self,TableName):
+        return
+    async def quickIDlist(self,TableName,limit,ColumnName=None,Value=None,offset=0):
+        sql=SQL().Select(TableName,'id')
+        if ColumnName and Value:sql.Where().Eq(ColumnName,Value)
+        sql.Orderby('id').Limit(limit,offset)
+        async with self.p.acquire() as conn:
+            async with conn.cursor() as cur:
+                await cur.execute(sql.text)
+                temp=await cur.fetchall()
+                return list(map(lambda x:str(x[0]),temp))
+    async def quickPage(self,TableName,limit,ColumnName='*',c_ColumnName=None,c_Value=None,c_offset=0,dic=True,join=None):
+        csql = SQL().Select(TableName, 'id')
+        if c_ColumnName and c_Value: csql.Where().Eq(c_ColumnName, c_Value)
+        csql.Orderby('id').Limit(limit, c_offset)
+        ssql= SQL().Select(f'({csql.text})').As()
+        sql=SQL().Select(TableName if not join else SQL().Innerjoin(TableName,*join).text,ColumnName).Where().In(f'{TableName}.id',ssql.text,raw=True)
+        print(sql.text)
+        async with self.p.acquire() as conn:
+            async with conn.cursor() as cur:
+                await cur.execute(sql.text)
+                result=await cur.fetchall()
+                if dic:result=self.TupleToDic(cur.description,result)
+                return result
+    @staticmethod
+    def TupleToDic(description,valueTupleList):
+        description=list(map(lambda x:x[0],description))
+        temp=[]
+        for i in valueTupleList:
+            temp.append(dict(zip(description,i)))
+        return temp
+
+class SQL:
+    def __init__(self):
+        self.text=''
+        self.safetext=''
+        self.safevalues=[]
+    def Select(self,TableName,ColumnName='*'):
+        self.text+= f' select {ColumnName if type(ColumnName).__name__=="str" else ",".join(ColumnName)} from {TableName}'
+        if ColumnName!='*':
+            if type(ColumnName).__name__=='str':ColumnName=f'`{ColumnName}`'
+            else:ColumnName=map(lambda x:f'`{x}`',ColumnName)
+        self.safetext+=f' select {ColumnName if type(ColumnName).__name__=="str" else ",".join(ColumnName)} from `{TableName}`'
+        return self
+    def Where(self):
+        self.text+=' where'
+        self.safetext+=' where'
+        return self
+    def Eq(self,ColumnName,Value):
+        self.text+=f' {ColumnName}={Value}'
+        self.safetext+=f' `{ColumnName}`=%s'
+        self.safevalues.append(Value)
+        return self
+    def Neq(self,ColumnName,Value):
+        self.text+=f' {ColumnName}!={Value}'
+        self.safetext += f' `{ColumnName}`!=%s'
+        self.safevalues.append(Value)
+        return self
+    def In(self,ColumnName,Value,raw=False):
+        self.text+=f' {ColumnName} in ({",".join(Value) if not raw else Value})'
+        self.safetext += f' `{ColumnName}` in ({",".join(["%s"]*len(Value)) if not raw else Value})'
+        self.safevalues+=Value
+        return self
+    def Notin(self,ColumnName,Value):
+        self.text+=f' {ColumnName} not in ({",".join(Value)})'
+        self.safetext += f' `{ColumnName}` not in ({",".join(["%s"]*len(Value))})'
+        self.safevalues+=Value
+        return self
+    def Limit(self,limit,offset=0):
+        self.text+=f' limit {str(offset)+"," if offset else ""}{limit}'
+        if type(limit).__name__!='int' and type(offset).__name__!='int':raise ValueError
+        self.safetext+=f' limit {str(offset)+"," if offset else ""}{limit}'
+        return self
+    def Orderby(self,ColumnName,ASC=True):
+        temp='asc' if ASC else 'desc'
+        self.text+=f' order by {ColumnName} {temp}'
+        self.safetext += f' order by `{ColumnName}` {temp}'
+        return self
+    def As(self,alias='temp'):
+        self.text+=f' as {alias}'
+        self.safetext+=f' as `{alias}`'
+        return self
+    def Innerjoin(self,TableName,JoinTableName,Key,Value):
+        self.text+=f' ({TableName} join {JoinTableName} on {Key}={Value})'
+        return self

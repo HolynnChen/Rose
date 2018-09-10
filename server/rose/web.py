@@ -40,7 +40,7 @@ def init():
     secret_key=hashlib.md5(base64.b64encode(secret_key.encode())).hexdigest().encode()
     setup(app, EncryptedCookieStorage(secret_key))
 
-    aiohttp_jinja2.setup(app, loader=jinja2.FileSystemLoader(TEMPLATE_DIR),variable_start_string='{{{',variable_end_string='}}}')
+    aiohttp_jinja2.setup(app, loader=jinja2.FileSystemLoader(TEMPLATE_DIR),variable_start_string='{{{',variable_end_string='}}}',enable_async=True)
     app.router.add_static('/static/', path=STATIC_DIR, name='static')
     app.router.add_routes(routes)
     #app.add_routes([web.get('/',lambda request:web.Response(status=302, headers={'location': '/admin/login' if 'index' not in co.config else co.config['index']}))])
