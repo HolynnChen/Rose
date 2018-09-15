@@ -20,6 +20,7 @@ def init():
     var['global_route']=route()
     var['templateFuncClassDic']={}
     var['init']=[]
+    var['application']={}
     __add_class_func_to_local__(var["global_route"], ['addClass', 'add_rewrite_rule'])
 
 def update(key,value):
@@ -156,7 +157,6 @@ class route:
         self.rule=[]
         self.__routeDic=['get','post']
         self.__rewriteMethods=['replace_start',]
-        self.obj={}
         self.variableRoutes={}
         self.regUrls=[]
         self.getRandom=lambda :''.join(random.sample(string.ascii_letters + string.digits, 8))+'_'+self.getic()
@@ -165,14 +165,14 @@ class route:
         return str(self.ic)
     def addClass(self,controllerClass,parentClassName='')->None:#应当能够匹配多层嵌套的class
         if len(self.regUrls)==0:self.regUrls=list(map(lambda x:(x.path,x.method),var['routes']._items))
-        className=controllerClass.__alias__ if '__alias__' in dir(controllerClass) and type(controllerClass.__alias__).__name__=='str' else controllerClass.__name__
-        route_variable_name=None
+        className=str(getattr(controllerClass,'__alias__',controllerClass.__name__))
         if className=="variable":
-            route_variable_name=self.getRandom() if "__variable_name__" not in dir(controllerClass) else controllerClass.__variable_name__
+            route_variable_name=getattr(controllerClass,'__variable_name__',self.getRandom())
             className='{'+route_variable_name+'}'
         theRandom=self.getRandom()
-        self.obj[theRandom+className]=controllerClass()
-        easy=self.obj[theRandom+className]
+        shortName=f'{(parentClassName.replace("/",".")+"."+className) if parentClassName!="" else className}'
+        var['application'][shortName]=controllerClass()
+        easy=var['application'][shortName]
         for i in filter(lambda x:not x.startswith('__') and not x.startswith('_'),dir(easy)):
             theType=type(getattr(easy,i)).__name__
             if theType=='type':
@@ -189,11 +189,16 @@ class route:
                     if len(list(filter(lambda m:m[0]==url and (m[1]==j or m[1]=='*'),self.regUrls))):raise ValueError
                     self.regUrls.append((url,j))
                     self.routes.append(getattr(web,j)(url,self.wrap(getattr(easy,i),easy)))
+                    if not name and url[:-1]:
+                        url=url[:-1]
+                        if len(list(filter(lambda m: m[0] == url and (m[1] == j or m[1] == '*'),self.regUrls))): break
+                        self.regUrls.append((url, j))
+                        self.routes.append(getattr(web, j)(url, self.wrap(getattr(easy, i), easy)))
                     break
 
         return
-    def route_rewrite(self,string,className,parentClassName):
-        temp=f'{parentClassName}/{className}/{string}'
+    def route_rewrite(self,string,className=None,parentClassName=None):
+        temp=f'{parentClassName}/{className}/{string}'if className or parentClassName else string
         for tmp in self.rule:
             if tmp[0] not in self.__rewriteMethods:continue
             if tmp[0]=='replace_start'and temp.startswith(tmp[1]):temp=temp.replace(tmp[1],tmp[2],1)
@@ -236,5 +241,6 @@ def __add_class_func_to_local__(obj,func_list):
 
 def addTemplateFuncClass(obj,static=False):
     if not type(obj).__name__ == "type":raise ValueError
-    if obj.__name__ in var['templateFuncClassDic']:raise NameError
-    var['templateFuncClassDic'][obj.__name__]=(obj() if not static else obj)
+    name=getattr(obj,'__alias__',obj.__name__)
+    if name in var['templateFuncClassDic']:raise NameError
+    var['templateFuncClassDic'][name]=(obj() if not static else obj)

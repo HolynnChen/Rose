@@ -15,3 +15,8 @@
 *.PDF	 diff=astextplain
 *.rtf	 diff=astextplain
 *.RTF	 diff=astextplain
+
+*.css linguist-language=python
+*.json linguist-language=python
+*.html linguist-language=python
+*.js linguist-language=python

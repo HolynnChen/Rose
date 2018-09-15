@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html>
+<head>
+	<title>RoseBlog User Login</title>
+	<link rel="stylesheet" type="text/css" href="/static/cms/css/elementUI.css">
+	<link rel="stylesheet" type="text/css" media="screen" href="/static/cms/css/main.css">
+	<script src="/static/cms/js/jquery.min.js"></script>
+	<script src="/static/cms/js/axios.min.js"></script>
+	<script src="/static/cms/js/vue.min.js"></script>
+	<script src="/static/cms/js/mtils.min.js"></script>
+	<script src="/static/cms/js/main.js"></script>
+</head>
+<body>
+	<div class="header">
+		<div class="header_main">
+			<div class="header_logo_container">
+				<div class="header_logo"></div>
+				<div class="header_title">Rose Blog</div>
+			</div>
+			<div class="header_links_container">
+				<div class="header_study header_block"><a><p>朝闻道</p></a></div>
+				<div class="header_summary header_block"><a><p>日思夜想</p></a></div>
+				<div class="header_diary header_block"><a><p>聚溪成河</p></a></div>
+			</div>
+		</div>
+	</div>
+	<div class="body body_fill">
+		<div class="login_area">
+			<div class="logo_area">
+				<div class="logo_img"></div>
+				<div class="logo_text">
+					<div class="logo_text_up">Rose Blog</div>
+					<div class="logo_text_down">用户登录系统</div>
+				</div>
+			</div>
+			<div class="login" id="login">
+				<form class="login_form">
+					<input class="login_form_username" type="text" name="username" v-model="form.user" placeholder="请输入您的用户名" />
+					<input class="login_form_password" type="password" name="password" v-model="form.password" placeholder="请输入您的密码" />
+					<button class="login_form_submit" name="submit" @click="submit">点击登录</button>
+				</form>
+			</div>
+		</div>
+	</div>
+</body>
+<script src="/static/cms/js/elementUI.js"></script>
+<script type="text/javascript">
+	new Vue({
+		el:'#login',
+		data(){return {form:{user:'',password:''}}},
+		methods:{
+			submit(event){
+				event.preventDefault();
+				axios.post(location.href,jq({
+					user:this.form.user,
+					password:window.Mtils.security.hex_md5(this.form.password)
+				})).then((respone_msg)=>{
+					let data=respone_msg.data;
+					console.log(data);
+					if(data.code!=0){
+						this.$message.error(data.err_msg)
+					}else{
+						this.$message.success('登陆成功!')
+						setTimeout('window.location.reload()',1000)
+					};
+				})
+			}
+		}
+	})
+</script>
+</html>

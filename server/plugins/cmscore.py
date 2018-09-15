@@ -71,10 +71,57 @@ def login_required(func):  # 用户登录状态校验
     return inner
 
 class Cms:
-    def __init__(self):
+    __first_init__=True
+    def __new__(cls,*args):
+        if not hasattr(cls,'__instance__'): cls.__instance__ = super().__new__(cls,*args)
+        return cls.__instance__
+
+    def __init__(self,db='mongo'):
+        if not self.__first_init__:return
+        self.user_table={}
         #self._m=MongoConnect()
-        self._m=MysqlConnect()
+        self._m=MysqlConnect() if db=='mysql' else MongoConnect()
         self._r=RedisConnect()
+        self.__first_init__=False
+
+    def login_required(self,func):
+        @wraps(func)
+        async def inner(cls, request,*args, **kwargs):
+            session = await get_session(request)
+            uid = session.get('uid',None)
+            if uid and uid in self.user_table and int(time.time()) - self.user_table[uid]['pass_time'] < 3600:
+                self.user_table[uid]['pass_time'] = int(time.time())
+                return await func(cls,request, *args, **kwargs)
+            else:
+                if uid and uid in self.user_table: del gb.var['user_table'][uid]
+                return web.Response(status=302, headers={'location': '/user/login'})
+
+        return inner
+
+    @staticmethod
+    def redirect(url,requireLogin=False,denyLogin=False):
+        self=Cms()
+        useLogin=requireLogin or denyLogin
+        def wrap(func):
+            @wraps(func)
+            async def inner(cls,request,*args, **kwargs):
+                if useLogin:
+                    session = await get_session(request)
+                    uid = session['uid'] if 'uid' in session else None
+                    hasLogin=uid and uid in self.user_table and int(time.time()) - self.user_table[uid]['pass_time'] < 3600
+                    if hasLogin:self.user_table[uid]['pass_time'] = int(time.time())
+                    if (requireLogin and not hasLogin) or (denyLogin and hasLogin):return web.Response(status=302, headers={'location': gb.var['global_route'].route_rewrite(url)})
+                    return await func(cls,request, *args, **kwargs)
+                else:
+                    return web.Response(status=302, headers={'location': gb.var['global_route'].route_rewrite(url)})
+            return inner
+        return wrap
+
+    async def user_login(self,request,user_name,value):
+        session = await get_session(request)
+        session['uid']=user_name
+        self.user_table[user_name] = {'msg': value, 'pass_time': int(time.time())}
+
     async def getuser(self,id=None,name=None,special_rule=None):
         if id:
             return await self._m.d.user.find_one({'id':id})
@@ -160,33 +207,46 @@ class RedisConnect:
 class MongoConnect:
     def __init__(self,host='localhost',port=27017):
         self.c=motor.motor_asyncio.AsyncIOMotorClient('localhost', 27017)
-        #if 'cmsmongo' not in self.c.list_database_names():
-        #    self._newinit_()
-        #else:
-        #    self.d=self.c['cmsmongo']
-        self.d=self.c['cmsmongo']
+        asyncio.ensure_future(self._newinit_())
+        #    self.d=self.c['RoseCMS']
 
-    def _newinit_(self):
+    async def _newinit_(self):
         #创建表,默认取cmsmongo，后加个vue来改初始化内容
-        self.d=self.c['cmsmongo']
-        self.d.insert_one({'config':{},'model':{}})
+        print('mongo init')
+        if 'RoseCMS' in await self.c.list_database_names():
+            self.d = self.c['RoseCMS']
+            return
+        #self.d.insert_one({'config':{},'model':{}})
         #之后这里是各种初始化、环境配置等
 
     async def getNextID(self,name):
-        counter=await self.d['counter'].find_one_and_update({'_id':name},{'$inc':{'seq':1}},projection={'seq':True,'_id':False},upsert=True,return_document=ReturnDocument.AFTER)
+        counter=await self.d['counter'].find_one_and_update({'id':name},{'$inc':{'seq':1}},projection={'seq':True,'id':False},upsert=True,return_document=ReturnDocument.AFTER)
         return counter['seq']
-    async def getCount(self,CollectionName,filter={}):
+    async def getCount(self,CollectionName,filter=None):
+        if not filter:filter={}
         return await self.d[CollectionName].count_documents(filter=filter)
-    async def getPage(self,CollectionName,startID=0,startPage=1,wantPage=1,limit=20,otherCondition={}):
+    async def getPage(self,CollectionName,startID=0,startPage=1,wantPage=1,limit=20,otherCondition=None):
+        if not otherCondition:otherCondition={}
         next=wantPage>=startPage
         query='$gte' if next else '$lt'
-        cusor=self.d[CollectionName].find({'ID':{query:startID}}.update(otherCondition),sort=[("ID",DESCENDING if next else ASCENDING)],skip=(wantPage-startPage)*limit if startPage-wantPage>=0 else (startPage-wantPage-1)*limit)
+        cusor=self.d[CollectionName].find({'id':{query:startID},**otherCondition},sort=[("id",DESCENDING if next else ASCENDING)],skip=(wantPage-startPage)*limit if startPage-wantPage>=0 else (startPage-wantPage-1)*limit)
         result=await cusor.to_list(length=limit)
         if next:return result
         else:return result[::-1]
     async def getLast(self,CollectionName,limit=20):
-        cusor=self.d[CollectionName].find(sort=[{"ID":DESCENDING}],limit=limit)
+        cusor=self.d[CollectionName].find(sort=[{"id":DESCENDING}],limit=limit)
         return await cusor.to_list(length=limit)
+    async def getAll(self,CollectionName):
+        temp=[]
+        cursor=self.d[CollectionName].find().sort([("id",DESCENDING if next else ASCENDING)])
+        for i in await cursor.to_list(None):
+            if not i:return temp
+            temp.append(i)
+        return temp
+    async def getOne(self,CollectionName,key,value,otherCondition=None):
+        if not otherCondition:otherCondition={}
+        return await self.d[CollectionName].find_one({key:value,**otherCondition})
+
 
 class MysqlConnect:
     def __init__(self,host='localhost',port=3306,user='root',password='123456',db='RoseCMS'):
@@ -196,28 +256,35 @@ class MysqlConnect:
         self.p=await self.p
     async def getCount(self,TableName):
         return
-    async def quickIDlist(self,TableName,limit,ColumnName=None,Value=None,offset=0):
-        sql=SQL().Select(TableName,'id')
-        if ColumnName and Value:sql.Where().Eq(ColumnName,Value)
-        sql.Orderby('id').Limit(limit,offset)
-        async with self.p.acquire() as conn:
-            async with conn.cursor() as cur:
-                await cur.execute(sql.text)
-                temp=await cur.fetchall()
-                return list(map(lambda x:str(x[0]),temp))
-    async def quickPage(self,TableName,limit,ColumnName='*',c_ColumnName=None,c_Value=None,c_offset=0,dic=True,join=None):
+    async def getPage(self,TableName,limit,ColumnName='*',c_ColumnName=None,c_Value=None,c_offset=0,dic=True,join=None):
         csql = SQL().Select(TableName, 'id')
         if c_ColumnName and c_Value: csql.Where().Eq(c_ColumnName, c_Value)
         csql.Orderby('id').Limit(limit, c_offset)
         ssql= SQL().Select(f'({csql.text})').As()
         sql=SQL().Select(TableName if not join else SQL().Innerjoin(TableName,*join).text,ColumnName).Where().In(f'{TableName}.id',ssql.text,raw=True)
-        print(sql.text)
         async with self.p.acquire() as conn:
             async with conn.cursor() as cur:
                 await cur.execute(sql.text)
                 result=await cur.fetchall()
                 if dic:result=self.TupleToDic(cur.description,result)
                 return result
+
+    async def getAll(self, TableName):
+        sql=SQL().Select(TableName)
+        async with self.p.acquire() as conn:
+            async with conn.cursor() as cur:
+                await cur.execute(sql.safetext,*sql.safevalues)
+                result=await cur.fetchall()
+                return self.TupleToDic(cur.description,result)
+
+    async def getOne(self,TabelName,c_Column,c_Value):
+        sql=SQL().Select(TabelName).Where().Eq(c_Column,c_Value)
+        async with self.p.acquire() as conn:
+            async with conn.cursor() as cur:
+                await cur.execute(sql.safetext,*sql.safevalues)
+                result=await cur.fetchone()
+                return self.TupleToDic_one(cur.description,result)
+
     @staticmethod
     def TupleToDic(description,valueTupleList):
         description=list(map(lambda x:x[0],description))
@@ -225,6 +292,9 @@ class MysqlConnect:
         for i in valueTupleList:
             temp.append(dict(zip(description,i)))
         return temp
+
+    @staticmethod
+    def TupleToDic_one(description,valuTuple):return dict(zip(list(map(lambda x: x[0], description)),valuTuple))
 
 class SQL:
     def __init__(self):

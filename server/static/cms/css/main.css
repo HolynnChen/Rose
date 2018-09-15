@@ -264,6 +264,81 @@ body{
     border-top:1px solid rgba(0,0,0,0.2); 
     font-size: 12px
 }
+
+.body_fill{
+    height: 100vh;
+    align-items: center;
+    display: flex;
+    flex-direction: column;
+}
+.login_area{
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    width: 500px;
+    height: 300px;
+    background-color: rgba(0,0,0,0.05);
+    border-radius:20px;
+    box-shadow: 0 0 30px rgba(0,0,0,0.2);
+}
+.login_form{
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    width: 300px;
+}
+.login_form input{
+    height: 30px;
+    border:1px solid #fff;
+    border-radius: 6px;
+    width: 100%;
+    outline: none;
+    padding-left: 10px;
+    transition: all 0.3s
+}
+.login_form input:focus{
+    box-shadow: 0 0 5px #F19483;
+}
+.login_form .login_form_password{
+    margin-top: 10px;
+    margin-bottom: 20px;
+}
+.login_form .login_form_submit{
+    width: 80px;
+    height: 35px;
+    border-radius: 5px;
+    background-color: #FCFAF2;
+    border: 1px solid rgba(0,0,0,0);
+    outline: none;
+    transition: all 0.3s
+}
+.login_form .login_form_submit:hover{
+    background-color: #F19483
+}
+.logo_area{
+    display: flex;
+    margin-bottom: 20px;
+}
+.logo_text{
+    display: flex;
+    flex-direction: column;
+    justify-content: space-around;
+}
+.logo_area .logo_img{
+    background-image: url('../img/logo.png');
+    background-size: contain;
+    background-repeat: no-repeat;
+    height: 60px;
+    width: 60px;
+    background-position: center center;
+    margin-right: 10px
+}
+.logo_text .logo_text_up{
+    font-weight: bold;
+    font-size: 24px;
+}
 /*动画区*/
 @keyframes jump_arrow{
     0%{

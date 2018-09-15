@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html>
 <head>
-	<title>cms test{{{test.a()}}}{{{test.b()}}}</title>
+	<title>RoseBlog</title>
 	<link rel="stylesheet" type="text/css" media="screen" href="static/cms/css/main.css">
 	<script src="https://cdn.bootcss.com/jquery/3.3.1/jquery.min.js"></script>
 	<script src="static/cms/js/main.js"></script>
@@ -44,25 +44,18 @@
 			<div class="body_block body_study">
 				<div class="body_block_top">朝闻道</div>
 				<div class="body_block_container">
-					{% for i in article_study %}
+					{% for i in cmstool.getLastArticle(1) %}
 					<a class="body_block_link">
 						<div class="body_block_title">
-							<div class="body_block_title_root">[{{{i['rootname']}}}]</div>
+							<div class="body_block_title_root">[{{{cmstool.getColumnName(i['rootid'])}}}]</div>
 							<div class="body_block_title_name">{{{i['title']}}}</div>
 						</div>
 						<div class="body_block_detail">
-							<div class="body_block_author">{{{i['creatorid']}}}</div>
+							<div class="body_block_author">{{{cmstool.getUserName(i['creatorid'])}}}</div>
 							<div class="body_block_time">{{{i['creattime'].strftime('%Y-%m-%d %H:%M:%S')}}}</div>
 						</div>
 					</a>
 					{% endfor %}
-					<a class="body_block_link">
-						<div class="body_block_title">测试</div>
-						<div class="body_block_detail">
-							<div class="body_block_author">测试</div>
-							<div class="body_block_time">2018-09-05</div>
-						</div>
-					</a>
 				</div>
 			</div>
 			<div class="body_block body_summary">
