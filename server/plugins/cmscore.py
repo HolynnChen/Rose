@@ -99,29 +99,45 @@ class Cms:
         return inner
 
     @staticmethod
-    def redirect(url,requireLogin=False,denyLogin=False):
+    def redirect(url,requireLogin=False,denyLogin=False,constom_JSON=None):
         self=Cms()
         useLogin=requireLogin or denyLogin
         def wrap(func):
             @wraps(func)
             async def inner(cls,request,*args, **kwargs):
                 if useLogin:
-                    session = await get_session(request)
-                    uid = session['uid'] if 'uid' in session else None
-                    hasLogin=uid and uid in self.user_table and int(time.time()) - self.user_table[uid]['pass_time'] < 3600
-                    if hasLogin:self.user_table[uid]['pass_time'] = int(time.time())
-                    if (requireLogin and not hasLogin) or (denyLogin and hasLogin):return web.Response(status=302, headers={'location': gb.var['global_route'].route_rewrite(url)})
+                    hasLogin=await self.hasLogin(request)
+                    if (requireLogin and not hasLogin) or (denyLogin and hasLogin):return (web.Response(status=302, headers={'location': gb.var['global_route'].route_rewrite(url)}) if not constom_JSON else web.json_response(constom_JSON))
                     return await func(cls,request, *args, **kwargs)
                 else:
-                    return web.Response(status=302, headers={'location': gb.var['global_route'].route_rewrite(url)})
+                    return (web.Response(status=302, headers={'location': gb.var['global_route'].route_rewrite(url)}) if not constom_JSON else web.json_response(constom_JSON))
             return inner
         return wrap
+
+    async def getUser(self,request):
+        session = await get_session(request)
+        temp=self.user_table.get(session['uid'],None)
+        if temp:return temp.get('msg',None)
+        return None
 
     async def user_login(self,request,user_name,value):
         session = await get_session(request)
         session['uid']=user_name
         self.user_table[user_name] = {'msg': value, 'pass_time': int(time.time())}
 
+    async def hasLogin(self,request):
+        session = await get_session(request)
+        uid = session['uid'] if 'uid' in session else None
+        hasLogin = uid and uid in self.user_table and int(time.time()) - self.user_table[uid]['pass_time'] < 3600
+        if hasLogin: self.user_table[uid]['pass_time'] = int(time.time())
+        return hasLogin
+
+    async def user_exit(self,request):
+        session = await get_session(request)
+        user_name=session.get('uid',None)
+        if not user_name or user_name not in self.user_table:return False
+        del self.user_table[user_name]
+        return True
     async def getuser(self,id=None,name=None,special_rule=None):
         if id:
             return await self._m.d.user.find_one({'id':id})
@@ -228,7 +244,7 @@ class MongoConnect:
     async def getPage(self,CollectionName,startID=0,startPage=1,wantPage=1,limit=20,otherCondition=None):
         if not otherCondition:otherCondition={}
         next=wantPage>=startPage
-        query='$gte' if next else '$lt'
+        query='$gt' if next else '$lt'
         cusor=self.d[CollectionName].find({'id':{query:startID},**otherCondition},sort=[("id",DESCENDING if next else ASCENDING)],skip=(wantPage-startPage)*limit if startPage-wantPage>=0 else (startPage-wantPage-1)*limit)
         result=await cusor.to_list(length=limit)
         if next:return result

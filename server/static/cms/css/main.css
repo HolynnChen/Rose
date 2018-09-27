@@ -339,6 +339,79 @@ body{
     font-weight: bold;
     font-size: 24px;
 }
+
+.header_absolute{
+    position: relative;
+    background-color: rgba(0,0,0,0.6)
+}
+.body_fill_absolute{
+    height: calc(100vh - 80px)
+}
+.body_user_content{
+    width: 1200px;
+    height: 100%;
+    box-shadow: 0 0 20px rgba(0,0,0,0.2);
+    display: flex;
+}
+.body_user_left{
+    height: 100%;
+    width: 240px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    background-color: rgba(17,50,133,0.05)
+}
+.body_user_right{
+    height: 100%;
+    width: 960px;
+}
+.body_user_left .body_user_pic{
+    width: 80px;
+    height: 80px;
+    border-radius: 50%;
+    box-shadow: 0 0 20px rgba(51,166,184,0.2);
+    border:2px solid #33A6B8;
+    margin-top:60px;
+}
+.body_user_left .body_user_msg{
+    font-size: 20px;
+    margin-top: 10px;
+}
+.body_user_left .body_user_setting{
+    margin-top: 40px;
+    font-size: 16px;
+    height: 150px;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    transition: all 0.3s;
+}
+.body_user_left .body_user_setting a{
+    display: block;
+    transition: all 0.3s;
+}
+.body_user_left .body_user_setting a:hover{
+    color:#33A6B8;
+    text-shadow: 0 0 5px rgba(51,166,184,0.3),0 0 10px rgba(51,166,184,0.3);
+}
+.body_user_iframe{
+    height: 100%;
+    width: 100%;
+    display: flex;
+    background-color: rgba(255,255,255,0.55);
+    flex-direction: column;
+}
+.body_user_iframe .iframe_top_title p{
+    font-size: 20px;
+    font-weight: bold;
+    margin-top: 20px;
+    margin-left: 15px;
+    margin-bottom: 10px;
+}
+#user_article .iframe_body table{
+    height: 100%;
+    width: 100%
+}
 /*动画区*/
 @keyframes jump_arrow{
     0%{

@@ -1,0 +1,128 @@
+<!DOCTYPE html>
+<html>
+<head>
+	<title>RoseBlog User</title>
+	<link rel="icon" href="/static/cms/img/favicon.ico">
+	<link rel="stylesheet" type="text/css" href="/static/cms/css/elementUI.css">
+	<link rel="stylesheet" type="text/css" media="screen" href="/static/cms/css/main.css">
+	<script src="/static/cms/js/jquery.min.js"></script>
+	<script src="/static/cms/js/axios.min.js"></script>
+	<script src="/static/cms/js/vue.min.js"></script>
+	<script src="/static/cms/js/mtils.min.js"></script>
+	<script src="/static/cms/js/main.js"></script>
+</head>
+<body>
+	<div class="header header_absolute">
+		<div class="header_main">
+			<div class="header_logo_container">
+				<div class="header_logo"></div>
+				<div class="header_title">Rose Blog</div>
+			</div>
+			<div class="header_links_container">
+				<div class="header_block"><a><p>文章管理</p></a></div>
+			{% set UserNow = cmstool.getUserFullMsg() %}
+			{% if UserNow.group== 1 %}
+				<div class="header_block"><a><p>栏目管理</p></a></div>
+				<div class="header_block"><a><p>模板管理</p></a></div>
+				<div class="header_block"><a><p>用户管理</p></a></div>
+				<div class="header_block"><a><p>系统管理</p></a></div>
+			{% endif %}
+			</div>
+		</div>
+	</div>
+	<div class="body body_fill_absolute" id="app">
+		<div class="body_user_content">
+			<div class="body_user_left">
+				<img class="body_user_pic" src="{{{UserNow.othermsg.user_img}}}">
+				<div class="body_user_msg"><p>{{{UserNow.name}}}</p></div>
+				<div class="body_user_setting">
+					<div class="body_user_setting_block"><a name="user_index" @click="user_index"><p>个人首页</p></a></div>
+					<div class="body_user_setting_block"><a name="user_article" @click="user_article"><p>文章管理</p></a></div>
+					<div class="body_user_setting_block"><a name="user_msg" @click="user_msg"><p>站内消息</p></a></div>
+					<div class="body_user_setting_block"><a name="user_setting" @click="user_setting"><p>用户设置</p></a></div>
+					<div class="body_user_setting_block"><a href="/user/exit"><p>注销退出</p></a></div>
+				</div>
+			</div>
+			<div class="body_user_right">
+				<div v-if="iframe[0]" class="body_user_iframe" id="user_index">
+					<div class="iframe_top_title"><p>个人首页</p></div>
+					<div class="iframe_body">
+						<div class="iframe_index_last_article">
+							
+						</div>
+					</div>
+				</div>
+				<div v-if="iframe[1]" class="body_user_iframe" id="user_article">
+					<div class="iframe_top_title"><p>文章管理</p></div>
+					<div class="iframe_body">
+						<div class="body_query">
+							<el-cascader expand-trigger="hover" :options="column_tree" @change="articlequery"></el-cascader>
+						</div>
+						<table>
+							<tr>
+								<th>标题</th>
+								<th>状态</th>
+								<th>发布时间</th>
+								<th>操作</th>
+							</tr>
+							<tr v-for="i in article_list">
+								<td>
+									<a :href="i['root_url']">[{{i['root_name']}}]</a>
+									<a :href="i['article_url']">{{i['title']}}</a>
+								</td>
+								<td>
+									{{i['status']}}
+								</td>
+								<td>
+									{{i['creattime']}}
+								</td>
+							</tr>
+						</table>
+					</div>
+				</div>
+				<div v-if="iframe[2]" class="body_user_iframe" id="user_msg">
+					<div class="iframe_top_title"><p>站内消息</p></div>
+				</div>
+				<div v-if="iframe[3]" class="body_user_iframe" id="user_setting">
+					<div class="iframe_top_title"><p>用户设置</p></div>
+				</div>
+				<div v-if="loading" class="body_user_iframe"></div>
+			</div>
+		</div>
+	</div>
+</body>
+<script src="/static/cms/js/elementUI.js"></script>
+<script>
+	new Vue({
+		'el':"#app",
+		data(){
+			return {iframe:[1,0,0,0],loading:false,column_tree:[]}
+		},
+		methods:{
+			user_index(e){
+				this.iframe=[1,0,0,0]
+			},
+			user_article(){
+				axios.get("/user/user_article").then((res)=>{
+					this.article_list=res.data;
+					this.iframe=[0,1,0,0];
+				})
+			},
+			user_msg(){
+				this.iframe=[0,0,1,0]
+			},
+			user_setting(){
+				this.iframe=[0,0,0,1]
+			},
+			articlequery(value){
+				console.log(value)
+			}
+		},
+		mounted:function(){
+			axios.get("/user/column_tree").then((res)=>{
+				this.column_tree=res.data
+			})
+		}
+	})
+</script>
+</html>

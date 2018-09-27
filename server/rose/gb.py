@@ -5,7 +5,7 @@ from functools import wraps
 from functools import update_wrapper
 import asyncio
 import async_timeout
-import random,string
+import random,string,uuid
 
 var={}
 plugin_table={}
@@ -159,10 +159,7 @@ class route:
         self.__rewriteMethods=['replace_start',]
         self.variableRoutes={}
         self.regUrls=[]
-        self.getRandom=lambda :''.join(random.sample(string.ascii_letters + string.digits, 8))+'_'+self.getic()
-    def getic(self):
-        self.ic+=1
-        return str(self.ic)
+        self.getRandom=lambda :str(uuid.uuid4())
     def addClass(self,controllerClass,parentClassName='')->None:#应当能够匹配多层嵌套的class
         if len(self.regUrls)==0:self.regUrls=list(map(lambda x:(x.path,x.method),var['routes']._items))
         className=str(getattr(controllerClass,'__alias__',controllerClass.__name__))

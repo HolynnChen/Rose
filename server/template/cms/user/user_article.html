@@ -1,0 +1,13 @@
+[
+{% for t in range(article_list|length) %}
+{% set i = article_list[t]%}
+{"id":{{{i.id}}},
+"title":"{{{i.title}}}",
+"root_name":"{{{cmstool.getColumnName(i.rootid)}}}",
+"article_url":"{{{cmstool.getArticleUrl(i.id)}}}",
+"root_url":"{{{cmstool.getColumnUrl(i.rootid)}}}",
+"creattime":"{{{cmstool.timeFormat(i.creattime)}}}",
+"status":"{{{cmstool.statusString(i.status)}}}"}
+{{{',' if not loop.last else ''}}}
+{% endfor %}
+]
