@@ -219,6 +219,7 @@ class route:
                     k=i.split('=')
                     if len(k)==2:temp[k[0]]=k[1]
             request.reqDic=temp
+            request.match_info.update(temp)
             if func.__name__=='variable':request.variable=request.match_info['variable']
             #try:
             #    return await func(request)
@@ -241,3 +242,8 @@ def addTemplateFuncClass(obj,static=False):
     name=getattr(obj,'__alias__',obj.__name__)
     if name in var['templateFuncClassDic']:raise NameError
     var['templateFuncClassDic'][name]=(obj() if not static else obj)
+
+def dic_multi_get(list,dic,default_value=None):
+    templist=[]
+    for i in list:templist.append(dic.get(i,default_value))
+    return templist

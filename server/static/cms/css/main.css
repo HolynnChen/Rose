@@ -347,6 +347,10 @@ body{
 .body_fill_absolute{
     height: calc(100vh - 80px)
 }
+.body_column{
+    flex-direction: column;
+    align-items: center;
+}
 .body_user_content{
     width: 1200px;
     height: 100%;
@@ -411,6 +415,47 @@ body{
 #user_article .iframe_body table{
     height: 100%;
     width: 100%
+}
+.body_query{
+    display: flex;
+    margin:10px 0;
+}
+.body_query>.el-cascader,.body_query>.el-button{
+    margin-left: 10px;
+}
+#editormd{
+    height: calc(100vh);
+    width: 90%;
+    margin:auto;
+    border:none;
+    box-shadow: 0 0 10px rgba(0,0,0,0.2);
+    margin-bottom:10px;
+}
+.article_setting_top{
+    display: flex;
+    justify-content: center;
+}
+.article_setting{
+    display: flex;
+    justify-content: center;
+    margin-top: 30px;
+    margin-bottom: 10px;
+    flex-direction: column;
+    width: 1200px
+}
+.short_input{
+    width: 120px;
+}
+.normal_input{
+    width: 260px;
+}
+.article_setting_title{
+    font-size: 20px;
+    font-weight: bold;
+    margin-bottom: 10px;
+}
+.article_save{
+    margin-bottom: 10px;
 }
 /*动画区*/
 @keyframes jump_arrow{

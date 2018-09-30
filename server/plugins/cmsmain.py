@@ -3,7 +3,7 @@ import rose.gb as gb
 from aiohttp import web
 import aiohttp_jinja2
 import jinja2
-import time
+import datetime
 import asyncio
 
 gb.plugin_table['CMS']={'introduction': 'CMS模块', 'url_enable': True,'url':'cms','version':'1.0.0','name':'cms'}
@@ -76,7 +76,9 @@ class cms:
             columnID=request.match_info.get('columnID',0)
             startPage=request.match_info.get('startPage',1)
             wantPage=request.match_info.get('wantPage',1)
-            temp=await Cms()._m.getPage('article',startID=startID,startPage=startPage,wantPage=wantPage,otherCondition={})
+            temp={}
+            if columnID and columnID.isdigit():temp['rootid']=int(columnID)
+            temp=await Cms()._m.getPage('article',startID=startID,startPage=startPage,wantPage=wantPage,otherCondition=temp)
             return {'article_list':temp}
 
         @Cms.redirect('', requireLogin=True, constom_JSON={'code': '100001', 'err_msg': '尚未登录'})
@@ -84,17 +86,35 @@ class cms:
             result=await Cms()._m.getAll('column')
             temp={i['id']:i for i in result}
             def getNode(nodeid):
-                this={"value":temp[nodeid]["alias"],"label":temp[nodeid]["name"]} if nodeid else []
+                this={"value":nodeid,"label":temp[nodeid]["name"]} if nodeid else []
                 childlist=list(filter(lambda x:x['rootid']==nodeid,result))
                 child=[]
-                for i in childlist:
-                    child.append(getNode(i["id"]))
-                if nodeid and len(childlist):this["children"]=child
-                elif not nodeid:this=child
-                print(this, nodeid)
+                for i in childlist:child.append(getNode(i["id"]))
+                if not nodeid:this=child
+                elif len(childlist):this["children"]=child
                 return this
             return web.json_response(getNode(0))
 
+        @Cms.redirect('/cms/user/login', requireLogin=True)
+        @aiohttp_jinja2.template('/cms/user/add_article.html')
+        async def add_article_get(self,request):
+            return
+        @Cms.redirect('',requireLogin=True,constom_JSON={'code':'100001','err_msg':'尚未登录'})
+        async def add_article_post(self,request):
+            columnID = request.match_info['nodeID']
+            try:
+                columnID=int(columnID)
+                if not await Cms()._m.getOne('column', 'id', columnID): return web.json_response(
+                    {'code': '100002', 'err_msg': '参数不正确'})
+            except:
+                return web.json_response({'code':'100002','err_msg':'参数不正确'})
+            data = await request.post()
+            title,editor,status,content=gb.dic_multi_get(['title','editor','status','content'],data)
+            if not (title and editor and status and content) or status not in ('0','1'):return web.json_response({'code':'100002','err_msg':'参数不正确'})
+            user=await Cms().getUser(request)
+            now=datetime.datetime.now()
+            await Cms()._m.insertOne('article',{'title':title,'rootid':int(columnID),'creatorid':user['id'],'editor':editor,'creattime':now,'updatetime':now,'content':content,'othermsg':{},'status':int(status)})
+            return web.json_response({'code':'0','msg':'success'})
 
 
 class cmstool_mysql:
@@ -105,7 +125,7 @@ class cmstool_mysql:
         self.__temp__={}
     async def getColumnName(self,ColumnID):
         if not 'ColumnList' in self.__temp__:await self.updateTempColumn()
-        return self.__temp__['ColumnList'][str(ColumnID)]['name']
+        return self.__temp__['ColumnList'][str(ColumnID)]['name'] if str(ColumnID) in self.__temp__['ColumnList'] else "栏目不存在"
     async def getUserName(self,UserID):
         result= await self.mysql.getOne('user','id',UserID)
         return result['name']
@@ -121,11 +141,13 @@ class cmstool_mongo:
         self.redis=gb.var['application']['cms'].cms_core._r
         self.__temp__={}
     async def getColumnName(self,ColumnID,alias=False):
+        ColumnID=str(ColumnID)
         if not 'ColumnList' in self.__temp__:await self.updateTemp('ColumnList','column')
+        if ColumnID not in self.__temp__['ColumnList'] :return "栏目不存在"
         return self.__temp__['ColumnList'][str(ColumnID)]['name'] if not alias else self.__temp__['ColumnList'][str(ColumnID)]['alias']
     async def getUserName(self,UserID):
         result=await self.mongo.getOne('user','id',UserID)
-        return result['name']
+        return result['name'] if result else "用户不存在"
     @jinja2.contextfunction
     async def getUserFullMsg(self,context):
         request=context['request']
@@ -153,11 +175,18 @@ class cmstool_mongo:
         name=await self.getColumnName(id,alias=True)
         return gb.var['global_route'].route_rewrite(f'/cms/{name}')
 
-    async def getArticleUrl(self,id,rootid=None):
+    async def getArticleUrlByID(self,id,rootid=None):
         if not rootid:rootid=(await self.mongo.getOne('article','id',id))['rootid']
         name=await self.getColumnName(rootid,alias=True)
         url=f'/cms/{name}/{id}'
         return gb.var['global_route'].route_rewrite(url)
+
+    async def getArticleUrl(self,article):
+        try:
+            id,rootid=gb.dic_multi_get(['id','rootid'],article)
+            return await self.getArticleUrlByID(id,rootid)
+        except:
+            return '#'
 gb.add_rewrite_rule(['replace_start','/cms',''])
 gb.addClass(cms)
 gb.addTemplateFuncClass(cmstool_mysql if db=='mysql' else cmstool_mongo)

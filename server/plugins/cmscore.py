@@ -171,17 +171,6 @@ class Cms:
             return True
         return False
 
-    def login(self,func):
-        @wraps(func)
-        async def inner(cls,*args,**kwargs):
-            session =await get_session(cls.request)
-            uid = session['uid'] if 'uid' in session else None
-            if uid and await self._r.c.exists(uid):
-                temp=await cls.request.post()
-                if '_auth' in  temp and not await self.makesure(uid,temp['_auth']):return gb.efc(12000)
-                return await func(cls,*args,**kwargs)
-            return web.Response(status=302, headers={'location': '/login'})
-        return inner
 
 
 class RedisConnect:
@@ -235,8 +224,8 @@ class MongoConnect:
         #self.d.insert_one({'config':{},'model':{}})
         #之后这里是各种初始化、环境配置等
 
-    async def getNextID(self,name):
-        counter=await self.d['counter'].find_one_and_update({'id':name},{'$inc':{'seq':1}},projection={'seq':True,'id':False},upsert=True,return_document=ReturnDocument.AFTER)
+    async def getNextID(self,CollectionName):
+        counter=await self.d['counter'].find_one_and_update({'CollectionName':CollectionName},{'$inc':{'seq':1}},projection={'CollectionName':False},upsert=True,return_document=ReturnDocument.AFTER)
         return counter['seq']
     async def getCount(self,CollectionName,filter=None):
         if not filter:filter={}
@@ -262,6 +251,11 @@ class MongoConnect:
     async def getOne(self,CollectionName,key,value,otherCondition=None):
         if not otherCondition:otherCondition={}
         return await self.d[CollectionName].find_one({key:value,**otherCondition})
+    async def insertOne(self,CollectionName,object):
+        temp={'id':await self.getNextID(CollectionName)}
+        temp.update(object)
+        result=await self.d[CollectionName].insert_one(temp)
+        return result
 
 
 class MysqlConnect:

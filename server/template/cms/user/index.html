@@ -57,6 +57,7 @@
 					<div class="iframe_body">
 						<div class="body_query">
 							<el-cascader expand-trigger="hover" :options="column_tree" @change="articlequery"></el-cascader>
+							<el-button round @click="add_article">添加文章</el-button>
 						</div>
 						<table>
 							<tr>
@@ -96,7 +97,7 @@
 	new Vue({
 		'el':"#app",
 		data(){
-			return {iframe:[1,0,0,0],loading:false,column_tree:[]}
+			return {iframe:[1,0,0,0],loading:false,column_tree:[],nodeID:''}
 		},
 		methods:{
 			user_index(e){
@@ -115,7 +116,18 @@
 				this.iframe=[0,0,0,1]
 			},
 			articlequery(value){
-				console.log(value)
+				console.log(value[value.length-1])
+				this.nodeID=value[value.length-1]
+				axios.get("/user/user_article",{params:{columdID:value[value.length-1]}}).then((res)=>{
+					this.article_list=res.data;
+				})
+			},
+			add_article(){
+				if(!this.nodeID){
+					this.$message.error('请选择栏目')
+					return
+				}
+				window.location='/user/add_article?nodeID='+this.nodeID
 			}
 		},
 		mounted:function(){

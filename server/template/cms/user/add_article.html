@@ -1,0 +1,133 @@
+<!DOCTYPE html>
+<html>
+<head>
+	<title>RoseBlog User</title>
+	<link rel="icon" href="/static/cms/img/favicon.ico">
+	<link rel="stylesheet" type="text/css" href="/static/cms/css/elementUI.css">
+	<link rel="stylesheet" type="text/css" href="/static/cms/css/editormd.css">
+	<link rel="stylesheet" type="text/css" media="screen" href="/static/cms/css/katex.min.css">
+	<link rel="stylesheet" type="text/css" media="screen" href="/static/cms/css/main.css">
+	<script src="/static/cms/js/jquery.min.js"></script>
+	<script src="/static/cms/js/axios.min.js"></script>
+	<script src="/static/cms/js/vue.min.js"></script>
+	<script src="/static/cms/js/mtils.min.js"></script>
+	<script src="/static/cms/js/editormd.min.js"></script>
+	<script src="/static/cms/js/main.js"></script>
+</head>
+<body>
+	<div class="header header_absolute">
+		<div class="header_main">
+			<div class="header_logo_container">
+				<div class="header_logo"></div>
+				<div class="header_title">Rose Blog</div>
+			</div>
+			<div class="header_links_container">
+				<div class="header_block"><a><p>文章管理</p></a></div>
+			{% set UserNow = cmstool.getUserFullMsg() %}
+			{% if UserNow.group== 1 %}
+				<div class="header_block"><a><p>栏目管理</p></a></div>
+				<div class="header_block"><a><p>模板管理</p></a></div>
+				<div class="header_block"><a><p>用户管理</p></a></div>
+				<div class="header_block"><a><p>系统管理</p></a></div>
+			{% endif %}
+			</div>
+		</div>
+	</div>
+	<div class="body body_column" id="app">
+		<div class="article_setting_top">
+			<div class="article_setting">
+				<div class="article_setting_title"><p>添加文章</p></div>
+				<div class="article_setting_items">
+					<el-form ref="form" :model="form" label-width="80px" :rules="rules">
+						<el-form-item label="栏目名称">
+							<el-input value="{{{cmstool.getColumnName(request.match_info.get('nodeID',0))}}}" disabled class="short_input"></el-input>
+						</el-form-item>
+						<el-form-item label="文章标题">
+							<el-input v-model="form.title" placeholder="请输入标题" clearable class="normal_input" ></el-input>
+						</el-form-item>
+						<el-form-item label="编辑者">
+							<el-input v-model="form.editor" placeholder="请输入作者名称" clearable class="normal_input"></el-input>
+						</el-form-item>
+						<el-form-item label="状态">
+							<el-radio-group v-model="form.status">
+								<el-radio label="0">正常</el-radio>
+								<el-radio label="1">草稿</el-radio>
+							</el-radio-group>
+						</el-form-item>
+					</el-form>
+				</div>
+			</div>
+		</div>
+		<div id="editormd"></div>
+		<div class="article_save">
+			<el-button type="success" @click="submit">提交</el-button>
+			<el-button>返回</el-button>
+		</div>
+	</div>
+</body>
+<script src="/static/cms/js/elementUI.js"></script>
+<script type="text/javascript">
+	var editor_app;
+	$(function(){
+		editor_app=editormd("editormd",{
+			path:'/static/cms/js/lib/',
+			width:"80%",
+			height:"calc(100vh - 80px)",
+			htmlDecode : "style,script,iframe|on*",
+			saveHTMLToTextarea : true,
+			searchReplace : true,
+			placeholder :"享受Markdown带来的乐趣吧~",
+			codeFold : true,
+			emoji : true,
+            taskList : true,
+            yncScrolling: 'single',
+            tocm: true,         // Using [TOCM]
+            tex : true,                   // 开启科学公式TeX语言支持，默认关闭
+            flowChart : true,          // 开启流程图支持，默认关闭
+            sequenceDiagram : true})
+	})
+	new Vue({
+		el:'#app',
+		data(){
+			return {
+				form:{title:'',status:'0',editor:'{{{UserNow.name}}}',content:''},
+				rules:{
+					title:[{require:true,message:'请输入标题',tigger:'blur'},
+					{min:5,max:30,message:'长度请控制在5-30个字符之间',tigger:'blur'}],
+					status:[{require:true,message:'请选择文章状态',tigger:'change'}],
+					editor:[{require:true,message:'请输入作者',tigger:'blur'},
+					{min:3,max:20,message:'长度请控制在3-20个字符之间',tigger:'blur'}]
+				}
+			}
+		},
+		methods:{
+			submit(){
+				this.form.content=editor_app.getHTML();
+				console.log(this.form)
+				this.$refs['form'].validate((valid)=>{
+					if(valid&&this.form.content){
+						axios.post(window.location,jq({
+							title:this.form.title,
+							status:this.form.status,
+							editor:this.form.editor,
+							content:this.form.content
+						})).then((res)=>{
+							console.log(res)
+							data=res.data
+							if(data.code!=0){
+								this.$message.error(data.err_msg)
+							}else{
+								this.$message.success('发布成功!')
+								setTimeout('javascript:window.location="/user"',1000)
+							};
+						})
+					}else{
+						this.$message.error('请完整填写文章信息')
+					}
+				})
+				
+			}
+		}
+	})
+</script>
+</html>
