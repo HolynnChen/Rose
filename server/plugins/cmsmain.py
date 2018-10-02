@@ -6,7 +6,7 @@ import jinja2
 import datetime
 import asyncio
 
-gb.plugin_table['CMS']={'introduction': 'CMS模块', 'url_enable': True,'url':'cms','version':'1.0.0','name':'cms'}
+gb.plugin_alert('CMS',{'introduction': 'CMS模块', 'url_enable': True,'url':'cms','version':'1.0.0','name':'cms'})
 db='mongodb'
 class cms:
     #__alias__='cms'
@@ -18,27 +18,53 @@ class cms:
 
     def __init__(self):
         self.cms_core = Cms('mongodb') #需要提前开启mongodb
+        asyncio.ensure_future(self._add_column_())
         print('cms running')
         return
+    async def _add_column_(self):
+        columnDic = await Cms()._m.getAll('column')
+        def get_columnUrl(dic,content=False):
+            url=f'/{dic["alias"]}'
+            if content:url+='/{variable}'
+            if dic['rootid']!=0:url=get_columnUrl(columnDic[str(dic['rootid'])])+url
+            return url
+
+        def column_index(template):
+            @aiohttp_jinja2.template(template)
+            async def inner(request):return
+            return inner
+        def column_content(template):
+            @aiohttp_jinja2.template(template)
+            async def inner(request):
+                try:
+                    article=await Cms().getarticle(id=int(request.match_info.get('variable',0)))
+                    return {'ArticleNow':article}
+                except:
+                    return {'ArticleNow':None}
+            return inner
+
+        for i in columnDic:
+            if 'indexTemplate' in i:
+                url=get_columnUrl(i)
+                gb.addRoute(column_index(i['indexTemplate']),url,'get','cms')
+                gb.addRoute(column_index(i['indexTemplate']), url+'/', 'get', 'cms')
+            if 'contentTemplate' in i:gb.addRoute(column_content(i['contentTemplate']),get_columnUrl(i,content=True),'get','cms')
 
     async def default_get(self,request):
-
-        #b=await self.cms_core._m.quickPage('article',20)
         return await self.index_get(request)
     @aiohttp_jinja2.template('/cms/index.html')
     async def index_get(self,request):
         return
 
-    class variable:#名字是随机
-        __variable_name__='column_name'
-        async def default_get(self,request):return await self.index_get(request)
-        async def variable_get(self,request):
-            return await self.index_get(request)
-            #return web.Response(text=f'hello,{request.match_info["column_name"]},{request.match_info["variable"]}')
-        async def index_get(self,request):
-            column_name=request.match_info["column_name"]
-            return
-
+#    class variable:#名字是随机
+#        __variable_name__='column_name'
+#        async def default_get(self,request):return await self.index_get(request)
+#        async def variable_get(self,request):
+#            return await self.index_get(request)
+#            #return web.Response(text=f'hello,{request.match_info["column_name"]},{request.match_info["variable"]}')
+#        async def index_get(self,request):
+#            column_name=request.match_info["column_name"]
+#            return
 
     class user:
         async def default_get(self,request):
@@ -170,6 +196,9 @@ class cmstool_mongo:
     @staticmethod
     def timeFormat(time):
         return time.strftime('%Y-%m-%d %H:%M:%S')
+    @staticmethod
+    def timeFormat_Simply(time):
+        return time.strftime('%Y-%m-%d')
 
     async def getColumnUrl(self,id):
         name=await self.getColumnName(id,alias=True)

@@ -34,6 +34,10 @@ body{
     z-index: 2;
     background-color: rgba(0,0,0,0.15);
 }
+.header_stick{
+    position: relative;
+    background-color: rgba(0,0,0,0.6)
+}
 .header_main{
     height: 100%;
     width: 1200px;
@@ -456,6 +460,26 @@ body{
 }
 .article_save{
     margin-bottom: 10px;
+}
+.body_content_container{
+    width: 1200px;
+    display: flex;
+    flex-direction: column;
+    min-height: calc(100vh - 80px)
+}
+.body_content_more{
+    display: flex;
+    margin:10px 0;
+}
+.body_content_title p{
+    font-size: 24px;
+    margin-top: 10px;
+    line-height: 32px;
+}
+.body_content_more p{
+    margin-right:10px;
+    font-size: 16px;
+    color:rgba(0,0,0,0.3);
 }
 /*动画区*/
 @keyframes jump_arrow{

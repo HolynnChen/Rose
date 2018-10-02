@@ -21,14 +21,14 @@ def init():
     var['templateFuncClassDic']={}
     var['init']=[]
     var['application']={}
-    __add_class_func_to_local__(var["global_route"], ['addClass', 'add_rewrite_rule'])
+    __add_class_func_to_local__(var["global_route"], ['addClass', 'add_rewrite_rule','route_rewrite','addRoute'])
 
 def update(key,value):
     var[key]=value
 '''
 暴露函数声明区
 '''
-global addClass,add_rewrite_rule
+global addClass,add_rewrite_rule,route_rewrite,addRoute
 
 async def worker():
     var['worklist']=asyncio.Queue()
@@ -86,11 +86,9 @@ def admin_login_required(func):  # 用户登录状态校验 该子程序仅用�
             return web.Response(status=302, headers={'location': '/admin/login'})
 
     return inner
-def random_string():
-    return ''.join(random.sample(string.ascii_letters + string.digits, 10))
 async def send_msg(name,json):
     if name in var['websocket_table']:
-        s=random_string()
+        s=str(uuid.uuid4())
         json['identify_string']=s
         await var['websocket_table'][name]['ws'].send_json(json)
         var['websocket_respone_table'][s]=asyncio.Queue()
@@ -170,7 +168,7 @@ class route:
         shortName=f'{(parentClassName.replace("/",".")+"."+className) if parentClassName!="" else className}'
         var['application'][shortName]=controllerClass()
         easy=var['application'][shortName]
-        for i in filter(lambda x:not x.startswith('__') and not x.startswith('_'),dir(easy)):
+        for i in filter(lambda x:not x.startswith('_'),dir(easy)):
             theType=type(getattr(easy,i)).__name__
             if theType=='type':
                 self.addClass(getattr(easy,i),f'/{className}' if not parentClassName else f'{parentClassName}/{className}')
@@ -192,7 +190,18 @@ class route:
                         self.regUrls.append((url, j))
                         self.routes.append(getattr(web, j)(url, self.wrap(getattr(easy, i), easy)))
                     break
-
+        return
+    def addRoute(self,func,url,method,prefix=""):
+        name=func.__name__
+        if name.startswith('_'):raise NameError("don't start with '_' in the func name")
+        if method in self.__routeDic:
+            url=("/"+prefix+url) if prefix else url
+            url=self.route_rewrite(url)
+            self.regUrls.append((url,method))
+            #self.routes.append(getattr(web, method)(url, self.wrap(func)))
+            var['app'].add_routes([getattr(web, method)(url, self.wrap(func))])
+            return
+        name="{variable}"
         return
     def route_rewrite(self,string,className=None,parentClassName=None):
         temp=f'{parentClassName}/{className}/{string}'if className or parentClassName else string
@@ -208,7 +217,7 @@ class route:
             raise ValueError
         self.rule.append(tmp)
         return True
-    def wrap(self,func,itsclass):#修复继承关系
+    def wrap(self,func,itsclass=None):#修复继承关系
         async def inner(request):
             url=str(request._rel_url)
             temp={}
@@ -243,7 +252,7 @@ def addTemplateFuncClass(obj,static=False):
     if name in var['templateFuncClassDic']:raise NameError
     var['templateFuncClassDic'][name]=(obj() if not static else obj)
 
-def dic_multi_get(list,dic,default_value=None):
-    templist=[]
-    for i in list:templist.append(dic.get(i,default_value))
-    return templist
+def dic_multi_get(key_list,dic,default_value=None):return list(map(lambda x:dic.get(x,default_value),key_list))
+
+def plugin_alert(Name,object):
+    plugin_table[Name] = object

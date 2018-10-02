@@ -56,6 +56,8 @@ def keep_worker():
 def server_start(devmode=False):
     Thread(target=keep_worker).start()
     app=init()
+    gb.var['app']=app
     if devmode:aiohttp_debugtoolbar.setup(app)
+    asyncio.get_event_loop().run_until_complete(asyncio.sleep(1)) #给予初始化缓冲时间
     web.run_app(app,port=co.config['port'] if 'port' in co.config else 8080)
 

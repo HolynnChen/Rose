@@ -22,7 +22,7 @@
 	<div>
 	{% for name in ftp_client.keys() %}
 	{% if ftp_client[name].status == "offline" %}
-		<li>{{name}}</li>
+		<li>{{{name}}}</li>
 	{% endif %}
 	{% endfor %}
 	</div>
@@ -30,19 +30,19 @@
 	<div>
 	{% for name in ftp_client.keys() %}
 	{% if ftp_client[name].status == "error" %}
-		<li>{{name}}</li>
+		<li>{{{name}}}</li>
 	{% endif %}
 	{% endfor %}
 	</div>
 <br>
 	<div>Plugins</div>
 	<div>{% for name in plugin_table.keys() %}
-		<li {% if "introduction" in plugin_table[name] %}title="{{plugin_table[name].introduction}}"{% endif %}>
-		{% if plugin_table[name].url_enable %}
-		<a href="{{plugin_table[name].url}}">
+		<li title="{{{plugin_table[name].get('introduction','')}}}">
+		{% if plugin_table[name].get("url_enable",None) %}
+		<a href="{{{plugin_table[name].get('url','#')}}}">
 		{% endif %}
-			{{name}}
-		{% if plugin_table[name].url_enable %}
+			{{{name}}}
+		{% if plugin_table[name].get("url_enable",None) %}
 		</a>
 		{% endif %}
 		</li>

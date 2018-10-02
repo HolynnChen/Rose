@@ -22,14 +22,14 @@
         <div>
             {% if ftp_user_list and not ftp_user_list==[] %}
         {% for name,pw in ftp_user_list %}
-        <li>{{name}}</li>
+        <li>{{{name}}</li>
         {% endfor %}
             {% endif %}
         </div>
         <div>项目详情</div>
         <div style="font-family: Consolas,Monaco,monospace;">
         {% for line in ftp_project_list %}
-        {{ line|safe }}<br>
+        {{{ line|safe }}<br>
         {% endfor %}
         </div>
     </div>
