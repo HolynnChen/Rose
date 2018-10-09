@@ -198,8 +198,8 @@ class route:
             url=("/"+prefix+url) if prefix else url
             url=self.route_rewrite(url)
             self.regUrls.append((url,method))
-            #self.routes.append(getattr(web, method)(url, self.wrap(func)))
-            var['app'].add_routes([getattr(web, method)(url, self.wrap(func))])
+            self.routes.append(getattr(web, method)(url, self.wrap(func)))
+            #var['app'].add_routes([getattr(web, method)(url, self.wrap(func))])
             return
         name="{variable}"
         return

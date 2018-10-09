@@ -213,8 +213,9 @@ class MongoConnect:
     def __init__(self,host='localhost',port=27017):
         self.c=motor.motor_asyncio.AsyncIOMotorClient('localhost', 27017)
         #asyncio.ensure_future(self._newinit_()) #暂时不判断是否在数据库内
-        self.d=self.c['RoseCMS']
-        print('mongo init')
+        if 'RoseCMS' in asyncio.get_event_loop().run_until_complete(self.c.list_database_names()):
+            self.d=self.c['RoseCMS']
+            print('mongo init')
 
     async def _newinit_(self):
         #创建表,默认取cmsmongo，后加个vue来改初始化内容

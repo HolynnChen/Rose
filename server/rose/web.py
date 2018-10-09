@@ -5,8 +5,10 @@ import hashlib
 from aiohttp_session import setup
 from aiohttp_session.cookie_storage import EncryptedCookieStorage
 import aiohttp_jinja2,jinja2
-import rose.gb as gb
-import rose.configloader as co
+from . import gb
+from . import configloader as co
+from aiohttp_jinja2 import get_env,setup
+from aiohttp.web import middleware
 try:
     import uvloop
     asyncio.set_event_loop_policy(uvloop.EventLoopPolicy())
@@ -14,7 +16,6 @@ except ImportError:
     pass
 gb.init()
 from aiohttp import web
-from aiohttp.web import middleware
 from threading import Thread
 import aiohttp_debugtoolbar
 
@@ -41,11 +42,14 @@ def init():
     secret_key=hashlib.md5(base64.b64encode(secret_key.encode())).hexdigest().encode()
     setup(app, EncryptedCookieStorage(secret_key))
 
-    aiohttp_jinja2.setup(app, loader=jinja2.FileSystemLoader(TEMPLATE_DIR),variable_start_string='{{{',variable_end_string='}}}',enable_async=True,context_processors=[aiohttp_jinja2.request_processor])
+    #aiohttp_jinja2.setup(app, loader=jinja2.FileSystemLoader(TEMPLATE_DIR),variable_start_string='{{{',variable_end_string='}}}',enable_async=True,context_processors=[aiohttp_jinja2.request_processor])
+    setup(app, loader=jinja2.FileSystemLoader(TEMPLATE_DIR), variable_start_string='{{{',
+                         variable_end_string='}}}', enable_async=True,
+                         context_processors=[aiohttp_jinja2.request_processor])
     app.router.add_static('/static/', path=STATIC_DIR, name='static')
     app.router.add_routes(routes)
-    #app.add_routes([web.get('/',lambda request:web.Response(status=302, headers={'location': '/admin/login' if 'index' not in co.config else co.config['index']}))])
-    aiohttp_jinja2.get_env(app).globals.update(gb.var['templateFuncClassDic'])
+    #aiohttp_jinja2.get_env(app).globals.update(gb.var['templateFuncClassDic'])
+    get_env(app).globals.update(gb.var['templateFuncClassDic'])
     print(gb.var['global_route'].routes)
     app.add_routes(gb.var['global_route'].routes)
     return app
@@ -58,6 +62,7 @@ def server_start(devmode=False):
     app=init()
     gb.var['app']=app
     if devmode:aiohttp_debugtoolbar.setup(app)
-    asyncio.get_event_loop().run_until_complete(asyncio.sleep(1)) #给予初始化缓冲时间
+    #asyncio.get_event_loop().run_until_complete(asyncio.sleep(1)) #给予初始化缓冲时间
     web.run_app(app,port=co.config['port'] if 'port' in co.config else 8080)
+
 

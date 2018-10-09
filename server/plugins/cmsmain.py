@@ -1,7 +1,7 @@
 from .cmscore import Cms
-import rose.gb as gb
+from rose import gb
+from rose.helper import template
 from aiohttp import web
-import aiohttp_jinja2
 import jinja2
 import datetime
 import asyncio
@@ -18,23 +18,23 @@ class cms:
 
     def __init__(self):
         self.cms_core = Cms('mongodb') #需要提前开启mongodb
-        asyncio.ensure_future(self._add_column_())
+        self._add_column_()
         print('cms running')
         return
-    async def _add_column_(self):
-        columnDic = await Cms()._m.getAll('column')
+    def _add_column_(self):
+        columnDic = asyncio.get_event_loop().run_until_complete(Cms()._m.getAll('column'))
         def get_columnUrl(dic,content=False):
             url=f'/{dic["alias"]}'
             if content:url+='/{variable}'
             if dic['rootid']!=0:url=get_columnUrl(columnDic[str(dic['rootid'])])+url
             return url
 
-        def column_index(template):
-            @aiohttp_jinja2.template(template)
+        def column_index(temp):
+            @template(temp)
             async def inner(request):return
             return inner
-        def column_content(template):
-            @aiohttp_jinja2.template(template)
+        def column_content(temp):
+            @template(temp)
             async def inner(request):
                 try:
                     article=await Cms().getarticle(id=int(request.match_info.get('variable',0)))
@@ -52,7 +52,7 @@ class cms:
 
     async def default_get(self,request):
         return await self.index_get(request)
-    @aiohttp_jinja2.template('/cms/index.html')
+    @template('/cms/index.html')
     async def index_get(self,request):
         return
 
@@ -71,7 +71,7 @@ class cms:
             return await self.index_get(request)
 
         @Cms.redirect('/cms/user',denyLogin=True)
-        @aiohttp_jinja2.template('/cms/user/login.html')
+        @template('/cms/user/login.html')
         async def login_get(self,request):
             return
 
@@ -86,7 +86,7 @@ class cms:
             return web.json_response({'code':0,'msg':'Login Success'})
 
         @Cms.redirect('/cms/user/login',requireLogin=True)
-        @aiohttp_jinja2.template('/cms/user/index.html')
+        @template('/cms/user/index.html')
         async def index_get(self,request):
             return
 
@@ -96,7 +96,7 @@ class cms:
             return web.Response(status=302, headers={'location': gb.var['global_route'].route_rewrite("/cms/user/login")})
 
         @Cms.redirect('',requireLogin=True,constom_JSON={'code':'100001','err_msg':'尚未登录'})
-        @aiohttp_jinja2.template('/cms/user/user_article.html')
+        @template('/cms/user/user_article.html')
         async def user_article_get(self,request):
             startID=request.match_info.get('startID',0)
             columnID=request.match_info.get('columnID',0)
@@ -122,7 +122,7 @@ class cms:
             return web.json_response(getNode(0))
 
         @Cms.redirect('/cms/user/login', requireLogin=True)
-        @aiohttp_jinja2.template('/cms/user/add_article.html')
+        @template('/cms/user/add_article.html')
         async def add_article_get(self,request):
             return
         @Cms.redirect('',requireLogin=True,constom_JSON={'code':'100001','err_msg':'尚未登录'})
