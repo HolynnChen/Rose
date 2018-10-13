@@ -5,3 +5,9 @@ asyncio
 async_timeout
 aiohttp_jinja2
 jinja2
+toml
+aiohttp_debugtoolbar
+aredis
+motor
+aiomysql
+pycryptodomex

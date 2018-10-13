@@ -7,7 +7,6 @@ from aiohttp_session.cookie_storage import EncryptedCookieStorage
 import aiohttp_jinja2,jinja2
 from . import gb
 from . import configloader as co
-from aiohttp_jinja2 import get_env,setup
 from aiohttp.web import middleware
 try:
     import uvloop
@@ -17,7 +16,6 @@ except ImportError:
 gb.init()
 from aiohttp import web
 from threading import Thread
-import aiohttp_debugtoolbar
 
 for root, dirs, files in os.walk('plugins'):
     for i in files:
@@ -42,14 +40,10 @@ def init():
     secret_key=hashlib.md5(base64.b64encode(secret_key.encode())).hexdigest().encode()
     setup(app, EncryptedCookieStorage(secret_key))
 
-    #aiohttp_jinja2.setup(app, loader=jinja2.FileSystemLoader(TEMPLATE_DIR),variable_start_string='{{{',variable_end_string='}}}',enable_async=True,context_processors=[aiohttp_jinja2.request_processor])
-    setup(app, loader=jinja2.FileSystemLoader(TEMPLATE_DIR), variable_start_string='{{{',
-                         variable_end_string='}}}', enable_async=True,
-                         context_processors=[aiohttp_jinja2.request_processor])
+    aiohttp_jinja2.setup(app, loader=jinja2.FileSystemLoader(TEMPLATE_DIR),variable_start_string='{{{',variable_end_string='}}}',enable_async=True,context_processors=[aiohttp_jinja2.request_processor])
     app.router.add_static('/static/', path=STATIC_DIR, name='static')
     app.router.add_routes(routes)
-    #aiohttp_jinja2.get_env(app).globals.update(gb.var['templateFuncClassDic'])
-    get_env(app).globals.update(gb.var['templateFuncClassDic'])
+    aiohttp_jinja2.get_env(app).globals.update(gb.var['templateFuncClassDic'])
     print(gb.var['global_route'].routes)
     app.add_routes(gb.var['global_route'].routes)
     return app
@@ -61,7 +55,9 @@ def server_start(devmode=False):
     Thread(target=keep_worker).start()
     app=init()
     gb.var['app']=app
-    if devmode:aiohttp_debugtoolbar.setup(app)
+    if devmode:
+        import aiohttp_debugtoolbar
+        aiohttp_debugtoolbar.setup(app)
     #asyncio.get_event_loop().run_until_complete(asyncio.sleep(1)) #给予初始化缓冲时间
     web.run_app(app,port=co.config['port'] if 'port' in co.config else 8080)
 

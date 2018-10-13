@@ -10,11 +10,8 @@ from functools import wraps
 from aiohttp_session import get_session
 import time
 from aiohttp import web
-import aredis
 import asyncio
 import json
-import motor
-import motor.motor_asyncio
 import aiomysql
 from Cryptodome.PublicKey import RSA
 from Cryptodome.Cipher import PKCS1_OAEP
@@ -175,6 +172,7 @@ class Cms:
 
 class RedisConnect:
     def __init__(self, host='localhost', port=6379, decode_responses=True):
+        import aredis
         self.host=host
         self.port=port
         self.decode_response=decode_responses
@@ -211,19 +209,16 @@ class RedisConnect:
 
 class MongoConnect:
     def __init__(self,host='localhost',port=27017):
-        self.c=motor.motor_asyncio.AsyncIOMotorClient('localhost', 27017)
-        #asyncio.ensure_future(self._newinit_()) #暂时不判断是否在数据库内
-        if 'RoseCMS' in asyncio.get_event_loop().run_until_complete(self.c.list_database_names()):
-            self.d=self.c['RoseCMS']
-            print('mongo init')
+        import motor.motor_asyncio
+        self.c=motor.motor_asyncio.AsyncIOMotorClient(host, port)
+        self.d = self.c['RoseCMS']
+        if 'RoseCMS' not in asyncio.get_event_loop().run_until_complete(self.c.list_database_names()):
+            asyncio.get_event_loop().run_until_complete(self._newinit_())
+        print('mongo init')
 
     async def _newinit_(self):
-        #创建表,默认取cmsmongo，后加个vue来改初始化内容
-        if 'RoseCMS' in await self.c.list_database_names():
-            self.d = self.c['RoseCMS']
-            return
-        #self.d.insert_one({'config':{},'model':{}})
-        #之后这里是各种初始化、环境配置等
+        default_collections=['article','column','counter','config','model_article','model_column','model_user','user','user_group']
+        for i in default_collections:await self.d.create_collection(i)
 
     async def getNextID(self,CollectionName):
         counter=await self.d['counter'].find_one_and_update({'CollectionName':CollectionName},{'$inc':{'seq':1}},projection={'CollectionName':False},upsert=True,return_document=ReturnDocument.AFTER)
