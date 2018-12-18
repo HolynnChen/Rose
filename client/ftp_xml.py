@@ -1,5 +1,7 @@
 import xml.etree.ElementTree as ET
 import os
+#后面是ftp信息获取
+import psutil
 
 xml_path='test.xml'
 filezilla_path=''
@@ -38,8 +40,6 @@ class ftp_xml_helper:
         self._xml.write(self._xml_path)
         os.system(f'"{self._filezilla_path}" /reload-config')
 
-
-
-
-
-
+class ftp_msg:
+    def get_disk_info(self):
+        return {i.device:[getattr(psutil.disk_usage(i.device),q) for q in ['total','used','free','percent']] for i in psutil.disk_partitions()}
