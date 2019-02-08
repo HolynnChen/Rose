@@ -18,6 +18,8 @@ from aiohttp import web
 from threading import Thread
 
 for root, dirs, files in os.walk('plugins'):
+    for i in dirs:
+        if os.path.exists(f'plugins/{i}/__init__.py'):__import__(f'plugins.{i}')
     for i in files:
         if not i=='__init__.py':__import__('plugins.'+i.split('.')[0])
     break
@@ -44,7 +46,7 @@ def init():
     app.router.add_static('/static/', path=STATIC_DIR, name='static')
     app.router.add_routes(routes)
     aiohttp_jinja2.get_env(app).globals.update(gb.var['templateFuncClassDic'])
-    print(gb.var['global_route'].routes)
+    print(f"\033[1;32;40m*** creat {len(gb.var['global_route'].routes)} route ***\033[0m")
     app.add_routes(gb.var['global_route'].routes)
     return app
 

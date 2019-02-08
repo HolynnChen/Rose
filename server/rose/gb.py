@@ -33,7 +33,7 @@ global addClass,add_rewrite_rule,route_rewrite,addRoute
 async def worker():
     var['worklist']=asyncio.Queue()
     print('start worker list')
-    getType=lambda x:str(type(x)).split("'")[1]
+    getType=lambda x:type(x).__name__
     while True:
         work=await var['worklist'].get()
         t=getType(work)
@@ -44,12 +44,12 @@ async def worker():
             if len(work)==2:
                 await work[0](work[1])
             elif len(work)==3:
-                if not getType(work[2])=='function':raise ValueError
+                assert getType(work[2])=='function'
                 await work[2](await work[0](work[1]))
             else:raise ValueError
         elif t=='dict':
             temp=None
-            if 'func' not in work:raise ValueError
+            assert 'func' not in work
             if 'args' in work:
                 if 'unpack_params' in work and work['unpack_params']==True:
                     if getType(work['arg']) in ('tuple','list'):temp= await work['func'](*work['args'])
@@ -108,36 +108,17 @@ def pack(url,method):
     routes = var['routes']
     if url in var['routes_temp']:raise ValueError
     else:var['routes_temp'].append(url)
-    if method=='get':
-        def pack_get(func):
-            @wraps(func)
-            @routes.get(url)
-            async def inner(cls, *args, **kwargs):return await func(cls, *args, **kwargs)
-            update('routes',routes)
-            return inner
-        return pack_get
-    elif method=='post':
-        def pack_post(func):
-            @wraps(func)
-            @routes.post(url)
-            async def inner(cls, *args, **kwargs):return await func(cls, *args, **kwargs)
-            update('routes',routes)
-            return inner
-        return pack_post
-    elif method=='view':
-        def pack_view(func):
-            @wraps(func)
-            @routes.view(url)
-            async def inner(cls, *args, **kwargs):return await func(cls, *args, **kwargs)
-            update('routes',routes)
-            return inner
-        return pack_view
+    method=getattr(routes,method)
+    def pack_get(func):
+        @wraps(func)
+        @method(url)
+        async def inner(cls, *args, **kwargs): return await func(cls, *args, **kwargs)
+        update('routes', routes)
+        return inner
+    return pack_get
 
 def expect(json,keyword):
-    for i in keyword:
-        if i not in json:
-            return False
-    return True
+    return all([json.get(i) for i in keyword])
 
 errorcode={
     10000:{'code':10000,'msg':'login fail','data':''},
