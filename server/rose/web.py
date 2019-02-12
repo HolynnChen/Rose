@@ -17,12 +17,14 @@ gb.init()
 from aiohttp import web
 from threading import Thread
 
-for root, dirs, files in os.walk('plugins'):
-    for i in dirs:
-        if os.path.exists(f'plugins/{i}/__init__.py'):__import__(f'plugins.{i}')
-    for i in files:
-        if not i=='__init__.py':__import__('plugins.'+i.split('.')[0])
-    break
+def load_plugin():
+    enable_list=co.config.get('enable_plugin',[])
+    for _, dirs, files in os.walk('plugins'):
+        for i in dirs:
+            if os.path.exists(f'plugins/{i}/__init__.py') and i in enable_list:__import__(f'plugins.{i}')
+        for i in files:
+            if not i=='__init__.py' and i.split('.')[0] in enable_list:__import__('plugins.'+i.split('.')[0])
+        break
 
 #enable gloabl header change for cors
 @middleware
@@ -55,6 +57,7 @@ def keep_worker():
     loop.run_until_complete(gb.worker())
 def server_start(devmode=False):
     Thread(target=keep_worker).start()
+    load_plugin()
     app=init()
     gb.var['app']=app
     if devmode:

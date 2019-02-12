@@ -14,9 +14,6 @@ class myconfig(co.ConfigParser):
 
 def init():
     global raw_config,config
-    '''config = myconfig()
-    config.read('config.ini')
-    chose('default')'''
     with open('config.ini') as f:
         raw_config=toml.load(f)
         config=raw_config['default']
