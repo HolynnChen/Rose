@@ -5,8 +5,26 @@ import jinja2
 import datetime
 import asyncio
 import sqlite3
+from functools import wraps
+from aiohttp_session import get_session
+import time
 
 gb.plugin_alert('FtpManager',{'introduction': 'Ftp远程管理模块', 'url_enable': True,'url':'ftpmanager','version':'1.0.0','name':'ftpmanager'})
+
+def manager_required(func):  # 用户登录状态校验
+    @wraps(func)
+    async def inner(cls, *args, **kwargs):
+        session = await get_session(cls.request)
+        uid = session['uid'] if 'uid' in session else None
+        if uid and uid in gb.var['user_table'] and int(time.time()) - gb.var['user_table'][uid]['pass_time'] < 3600:
+            gb.var['user_table'][uid]['pass_time'] = int(time.time())
+            cls.request.app.userdata = gb.var['user'][uid]
+            cls.request.app.usertable = gb.var['user_table'][uid]
+            return await func(cls, *args, **kwargs)
+        else:
+            if uid and uid in gb.var['user_table']: del gb.var['user_table'][uid]
+            return web.Response(status=302, headers={'location': '/admin/login'})
+    return inner
 
 class ftpmanager:
     __instance__ = None
@@ -32,7 +50,7 @@ class ftpmanager:
         if not gb.expect(data,['username''password']):return web.json_response({'code':-1,'err_msg':'参数不完整'})
         
     async def server_list_get(self,request):
-        return self.__helper__
+        return web.json_response(self.__helper__.get_server_list())
 
 class sqlite_helper:
     __instance__ = None
@@ -93,3 +111,7 @@ class sqlite_helper:
         cursor.execute(sql, (name, server_id, more))
         self._db.commit()
 
+    def get_server_list(self):
+        cursor=self._db.cursor()
+        sql='select * from server'
+        return cursor.execute(sql).fetchall()
