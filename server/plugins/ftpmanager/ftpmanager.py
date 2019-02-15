@@ -8,36 +8,41 @@ import sqlite3
 from functools import wraps
 from aiohttp_session import get_session
 import time
+import re
 
 gb.plugin_alert('FtpManager',{'introduction': 'Ftp远程管理模块', 'url_enable': True,'url':'ftpmanager','version':'1.0.0','name':'ftpmanager'})
 
 def manager_required(func):  # 用户登录状态校验
     @wraps(func)
-    async def inner(cls, *args, **kwargs):
-        session = await get_session(cls.request)
-        uid = session['uid'] if 'uid' in session else None
-        if uid and uid in gb.var['user_table'] and int(time.time()) - gb.var['user_table'][uid]['pass_time'] < 3600:
-            gb.var['user_table'][uid]['pass_time'] = int(time.time())
-            cls.request.app.userdata = gb.var['user'][uid]
-            cls.request.app.usertable = gb.var['user_table'][uid]
+    async def inner(cls,request, *args, **kwargs):
+        session = await get_session(request)
+        uid = session.get('uid')
+        obj=ftpmanager()
+        if uid and uid in obj.__user_table[uid] and int(time.time()) - obj.__user_table[uid] < 3600:
+            obj.__user_table[uid]['pass_time'] = int(time.time())
             return await func(cls, *args, **kwargs)
         else:
-            if uid and uid in gb.var['user_table']: del gb.var['user_table'][uid]
-            return web.Response(status=302, headers={'location': '/admin/login'})
+            if uid and uid in obj.__user_table: del obj.__user_table[uid]
+            return web.Response(status=302, headers={'location': '/ftpmanager/login'})
     return inner
+
+def expect(data,target):return all([i in data for i in target])
 
 class ftpmanager:
     __instance__ = None
     __helper__=None
+    __user_table={}
 
     def __new__(cls):
         if not cls.__instance__: cls.__instance__ = object.__new__(cls)
         return cls.__instance__
     def __init__(self):
+        if self.__instance__:return
         self.__helper__=sqlite_helper()
         print('FtpManager模块已启用')
     async def default_get(self,request):
         return await self.index_get(request)
+    @manager_required
     @template('/ftpmanager/index.html')
     async def index_get(self,request):
         return
@@ -47,8 +52,15 @@ class ftpmanager:
         return
     async def login_post(self,request):
         data = await request.post()
-        if not gb.expect(data,['username''password']):return web.json_response({'code':-1,'err_msg':'参数不完整'})
-        
+        if not expect(data,['username''password']):return web.json_response({'code':-1,'err_msg':'参数不完整'})
+        user=self.__helper__.check_manager(data['username'],data['password'])
+        if user:
+            self.__user_table[user['id']]=user
+            return web.json_response({'code':302,'redirect':'/ftpmanager/index'})
+        else:
+            return web.json_response({'code':10001,'msg':'账号或密码错误'})
+
+    @manager_required    
     async def server_list_get(self,request):
         return web.json_response(self.__helper__.get_server_list())
 
@@ -111,7 +123,28 @@ class sqlite_helper:
         cursor.execute(sql, (name, server_id, more))
         self._db.commit()
 
+    @staticmethod
+    def _warp(data,cursor_description):
+        column=[i[0] for i in cursor_description]
+        if isinstance(data,tuple):
+            return dict(zip(column,data))
+        else:
+            return list(map(lambda x:dict(zip(column,x)),data))
+
+
     def get_server_list(self):
         cursor=self._db.cursor()
         sql='select * from server'
         return cursor.execute(sql).fetchall()
+    def search(self,table,filter_dict={},column_filter=None,fetchlimit=0,special_sql=None):
+        cursor = self._db.cursor()
+        sql = special_sql or 'select {column_filter or "*"} from {table} '
+        if len(filter_dict) and not special_sql:sql+=' and '.join([i+'=:'+i for i in filter_dict.keys()])
+        cursor.execute(sql,filter_dict)
+        if fetchlimit<0:return self._warp(cursor.fetchall(),cursor.description)
+        elif fetchlimit==0:return self._warp(cursor.fetchone(),cursor.description)
+        else: return self._warp(cursor.fetchmany(fetchlimit),cursor.description)
+
+    def check_manager(self,username,password):
+        key='mail' if re.match(r'^[\w]+[\w._]*@\w+\.[a-zA-Z]+$', username) else 'name'
+        return self.search('manager',{key:password})
