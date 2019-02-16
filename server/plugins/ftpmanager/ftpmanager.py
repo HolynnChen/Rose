@@ -41,7 +41,7 @@ class ftpmanager:
         if not cls.__instance__: cls.__instance__ = object.__new__(cls)
         return cls.__instance__
     def __init__(self):
-        if self.__instance__:return
+        if self.__helper__:return
         self.__helper__=sqlite_helper()
         print('FtpManager模块已启用')
     async def default_get(self,request):
@@ -81,8 +81,8 @@ class ftpmanager:
 
     async def ws_keep_get(self,request):
         ws = web.WebSocketResponse(heartbeat=30, receive_timeout=60)
-        session=get_session(request)
-        if not session.get('ftpmanager_verify'):return
+        session=await get_session(request)
+        if not expect(session,['ftpmanager_verify','server_id']) or not session.get('ftpmanager_verify'):return web.Response(status=404,reason='非法登陆')
         server_id=session['server_id']
         self.__server_table[server_id]={'status':1}
         self.__helper__.active_server(server_id)
@@ -90,13 +90,16 @@ class ftpmanager:
         try:
             async for msg in ws:
                 json = msg.json()
+                print(json)
             return ws
         except asyncio.CancelledError:
-            self.__server_table[server_id]['status']=2
+            self.__server_table[server_id]['status']=0
+            self.__helper__.change_server_status(server_id,0)
             print('offline', server_id)
             return ws
         except:
-            self.__server_table[server_id]['status']=3
+            self.__server_table[server_id]['status']=2
+            self.__helper__.change_server_status(server_id,2)
             print('error', server_id)
             return ws
 
@@ -115,7 +118,7 @@ class sqlite_helper:
         sql_init=[
             'create table users (id integer primary key autoincrement not null, name text not null, password text not null, mail text not null, db_note text)',
             'create table manager (id integer primary key autoincrement not null, name text not null, password text not null, mail text not null, permissions text)',
-            'create table server (id integer primary key autoincrement not null, name text not null, ip text not null, status int not null)',
+            'create table server (id integer primary key autoincrement not null, name text not null, server_id text not null, status int not null, more text)',
             'create table db_note (id integer primary key autoincrement not null, name text not null, server_id text not null, more text)'
         ]
         for i in sql_init:cursor.execute(i)
@@ -162,6 +165,7 @@ class sqlite_helper:
     @staticmethod
     def _warp(data,cursor_description):
         column=[i[0] for i in cursor_description]
+        if not data:return None
         if isinstance(data,tuple):
             return dict(zip(column,data))
         else:
@@ -184,18 +188,18 @@ class sqlite_helper:
         else: return self._warp(cursor.fetchmany(fetchlimit),cursor.description)
     def insert(self,table,dicts,special_sql=None):
         cursor=self._db.cursor()
-        sql=special_sql or f'inser into {table} ({",".join(dicts.keys())}) values ({",".join([":"+i for i in dicts.keys()])})'
+        sql=special_sql or f'insert into {table} ({",".join(dicts.keys())}) values ({",".join([":"+i for i in dicts.keys()])})'
         if isinstance(dicts,list):cursor.executemany(sql,dicts)
         else:cursor.execute(sql,dicts)
         self._db.commit()
     def update(self,table,value_dict,filter_dict={},column_filter=None,special_sql=None):
         cursor = self._db.cursor()
         temp=",".join([i+'=?' for i in value_dict.keys()])
-        sql = special_sql or f'update {table} at {temp}'
+        sql = special_sql or f'update {table} set {temp}'
         if len(filter_dict) and not special_sql:
             sql+=' where '
             sql+=' and '.join([i+'=?' for i in filter_dict.keys()])
-        cursor.execute(sql,tuple(value_dict.values()+filter_dict.values()))
+        cursor.execute(sql,tuple(list(value_dict.values())+list(filter_dict.values())))
         self._db.commit()
 
     def check_manager(self,username,password):
@@ -204,8 +208,9 @@ class sqlite_helper:
     
     def active_server(self,server_id):
         if not self.search('server',{'server_id':server_id}):
-            self.insert('server',{'server_id':server_id,'status':1})
+            self.insert('server',{'server_id':server_id,'status':1,'name':server_id})
             return
-        self.update('server',{'status':1},{'server_id':server_id})
+        self.change_server_status(server_id,1)
+    def change_server_status(self,server_id,status):self.update('server',{'status':status},{'server_id':server_id})
         
             
