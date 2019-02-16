@@ -37,7 +37,7 @@ class ftpmanager:
     __instance__ = None
     __helper__=None
     __user_table={}
-    __server_table={}
+    server_table={}
     __ws_table={}
 
     def __new__(cls):
@@ -70,6 +70,12 @@ class ftpmanager:
     @manager_required    
     async def server_list_get(self,request):
         return web.json_response(self.__helper__.get_server_list())
+        
+    async def test_get(self,request):
+        wst=self.server_table['9ac6657de9dc19bd2b273857261362e9']['wst']
+        s=await wst.send({'type':'ftpmanager_tools','cmd':'get_disk_info'})
+        r=await wst.get(s)
+        return web.json_response(r)
     
     async def ws_confirm_post(self,request):
         data = await request.post()
@@ -84,33 +90,34 @@ class ftpmanager:
 
     async def ws_keep_get(self,request):
         ws = web.WebSocketResponse(heartbeat=30, receive_timeout=60)
+        await ws.prepare(request)
         session=await get_session(request)
         if not expect(session,['ftpmanager_verify','server_id']) or not session.get('ftpmanager_verify'):return web.Response(status=404,reason='非法登陆')
         server_id=session['server_id']
-        self.__server_table[server_id]={'status':1,'ws':ws_tool(ws)}
+        wst=ws_tool(ws)
+        self.server_table[server_id]={'status':1,'wst':wst}
         self.__helper__.active_server(server_id)
-        
-        await ws.prepare(request)
-        try:
-            print('online',server_id)
-            async for msg in ws:
-                json = msg.json()
-                if expect(json,['data','uuid']):
-                    if self.__server_table[server_id]['ws'].__Queue:self.__server_table[server_id]['ws'].__Queue.put_nowait(json['data'])
-                    else:print('发生意料外的json反馈')
-                else:
-                    print(json)#处理其他情况
-            return ws
-        except asyncio.CancelledError:
-            self.__server_table[server_id]['status']=0
-            self.__helper__.change_server_status(server_id,0)
-            print('offline', server_id)
-            return ws
-        except:
-            self.__server_table[server_id]['status']=2
-            self.__helper__.change_server_status(server_id,2)
-            print('error', server_id)
-            return ws
+        # try:
+        print('online',server_id)
+        async for msg in ws:
+            json = msg.json()
+            if expect(json,['data','uuid']):
+                print(json)
+                if json['uuid'] in wst.Queue:wst.Queue[json['uuid']].put_nowait(json['data'])
+                else:print('发生意料外的json反馈')
+            else:
+                print(json)#处理其他情况
+        return ws
+        # except asyncio.CancelledError:
+        #     self.server_table[server_id]['status']=0
+        #     self.__helper__.change_server_status(server_id,0)
+        #     print('offline', server_id)
+        #     return ws
+        # except:
+        #     self.server_table[server_id]['status']=2
+        #     self.__helper__.change_server_status(server_id,2)
+        #     print('error', server_id)
+        #     return ws
 
 class sqlite_helper:
     __instance__ = None
@@ -223,23 +230,26 @@ class sqlite_helper:
     def change_server_status(self,server_id,status):self.update('server',{'status':status},{'server_id':server_id})
 
 class ws_tool:
-    ws_connect=None
-    __Queue={}
+    ws=None
+    Queue={}
     def __init__(self,ws):
-        self.wx_connect=ws
-    async def send(self,json):
-            s=uuid.uuid1()
-            self.__Queue[s]=asyncio.Queue(maxsize=1)
-            await self.ws_connect.send_json({'data':json,'uuid':s})
-            return s
+        self.ws=ws
+    async def send(self,json,s=None):
+        s=s or uuid.uuid1().hex
+        print(s)
+        self.Queue[s]=asyncio.Queue(maxsize=1)
+        await self.ws.send_json({'data':json,'uuid':s})
+        return s
     async def get(self,s,timeout=5):
         try:
             async with async_timeout.timeout(timeout):
-                json=await self.__Queue[s].get()
+                json=await self.Queue[s].get()
                 return json
         except (asyncio.TimeoutError,asyncio.CancelledError):
             return None
         finally:
-            del self.__Queue[s]
+            del self.Queue[s]
+    async def respon(self,s,json):await self.send(json,s=s)
+
         
             
