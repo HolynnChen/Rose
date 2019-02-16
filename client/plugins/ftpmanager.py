@@ -1,5 +1,6 @@
 import asyncio
 import aiohttp
+import psutil
 #import configloader as co
 #import gb
 co={
@@ -9,7 +10,7 @@ import uuid,hashlib
 NAME=hashlib.md5(uuid.UUID(int = uuid.getnode()).hex[-12:].encode()).hexdigest()
 APP_KEY='1234567890'
 Encrypt=hashlib.sha256((NAME+APP_KEY).encode()).hexdigest()
-
+def expect(data,target):return all([i in data for i in target])
 class ftpmanager:
     def __init__(self):
         return
@@ -29,10 +30,21 @@ class ftpmanager:
             elif msg.type == aiohttp.WSMsgType.ERROR:
                 break
             try:
-                msg.json()
+                resp=msg.json()
+                if not expect(resp,['type','cmd','data']):
+                    print('服务端发来不支持的信息',resp)
+                    break
+                if resp['type']=='ftpmanager_tools':
+                    if hasattr(ftpmanager_tools,resp['cmd']) and callable(getattr(ftpmanager_tools,resp['cmd'])):
+                        break
             except:
                 continue
         return
+
+class ftpmanager_tools:
+    @staticmethod
+    def get_disk_info():
+        return {i:psutil.disk_usage(i) for i in [j.device for j in psutil.disk_partitions()]}
 temp=ftpmanager()
 loop=asyncio.get_event_loop()
 loop.run_until_complete(temp.connect())

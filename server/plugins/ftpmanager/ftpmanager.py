@@ -10,6 +10,8 @@ from aiohttp_session import get_session
 import time
 import re
 import hashlib
+import uuid
+import async_timeout
 
 APP_KEY='1234567890'
 
@@ -36,6 +38,7 @@ class ftpmanager:
     __helper__=None
     __user_table={}
     __server_table={}
+    __ws_table={}
 
     def __new__(cls):
         if not cls.__instance__: cls.__instance__ = object.__new__(cls)
@@ -84,13 +87,19 @@ class ftpmanager:
         session=await get_session(request)
         if not expect(session,['ftpmanager_verify','server_id']) or not session.get('ftpmanager_verify'):return web.Response(status=404,reason='非法登陆')
         server_id=session['server_id']
-        self.__server_table[server_id]={'status':1}
+        self.__server_table[server_id]={'status':1,'ws':ws_tool(ws)}
         self.__helper__.active_server(server_id)
+        
         await ws.prepare(request)
         try:
+            print('online',server_id)
             async for msg in ws:
                 json = msg.json()
-                print(json)
+                if expect(json,['data','uuid']):
+                    if self.__server_table[server_id]['ws'].__Queue:self.__server_table[server_id]['ws'].__Queue.put_nowait(json['data'])
+                    else:print('发生意料外的json反馈')
+                else:
+                    print(json)#处理其他情况
             return ws
         except asyncio.CancelledError:
             self.__server_table[server_id]['status']=0
@@ -212,5 +221,25 @@ class sqlite_helper:
             return
         self.change_server_status(server_id,1)
     def change_server_status(self,server_id,status):self.update('server',{'status':status},{'server_id':server_id})
+
+class ws_tool:
+    ws_connect=None
+    __Queue={}
+    def __init__(self,ws):
+        self.wx_connect=ws
+    async def send(self,json):
+            s=uuid.uuid1()
+            self.__Queue[s]=asyncio.Queue(maxsize=1)
+            await self.ws_connect.send_json({'data':json,'uuid':s})
+            return s
+    async def get(self,s,timeout=5):
+        try:
+            async with async_timeout.timeout(timeout):
+                json=await self.__Queue[s].get()
+                return json
+        except (asyncio.TimeoutError,asyncio.CancelledError):
+            return None
+        finally:
+            del self.__Queue[s]
         
             

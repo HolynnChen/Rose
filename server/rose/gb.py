@@ -88,7 +88,7 @@ def admin_login_required(func):  # 用户登录状态校验 该子程序仅用�
     return inner
 async def send_msg(name,json):
     if name in var['websocket_table']:
-        s=str(uuid.uuid4())
+        s=str(uuid.uuid1())
         json['identify_string']=s
         await var['websocket_table'][name]['ws'].send_json(json)
         var['websocket_respone_table'][s]=asyncio.Queue()
