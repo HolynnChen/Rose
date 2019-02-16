@@ -17,7 +17,6 @@ def init():
     config.read('config.ini')
     chose('default')
 
-
 def chose(sec):
     global config
     if sec not in config.sections():
