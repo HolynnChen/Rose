@@ -33,6 +33,14 @@ def manager_required(func):  # 用户登录状态校验
 
 def expect(data,target):return all([i in data for i in target])
 
+async def sorted_wait(tasks):
+    async def index(i,task):
+        result=await task
+        return i,result
+    s,_=await asyncio.wait([index(i,tasks[i]) for i in range(len(tasks))])
+    s=list(map(lambda x:x[1],sorted([i.result() for i in s],key=lambda x:x[0])))
+    return s
+
 class ftpmanager:
     __instance__ = None
     __helper__=None
@@ -72,9 +80,12 @@ class ftpmanager:
         return web.json_response(self.__helper__.get_server_list())
         
     async def test_get(self,request):
-        wst=self.server_table['9ac6657de9dc19bd2b273857261362e9']['wst']
-        s=await wst.send({'type':'ftpmanager_tools','cmd':'get_disk_info'})
-        r=await wst.get(s)
+        #wst=self.server_table['9ac6657de9dc19bd2b273857261362e9']['wst']
+        wsts=[self.server_table[i]['wst'] for i in self.server_table]
+        s=await sorted_wait([i.send({'type':'ftpmanager_tools','cmd':'get_disk_info'}) for i in wsts])
+        r=await sorted_wait([wsts[i].get(s[i]) for i in range(len(wsts))])
+        #s=await wst.send({'type':'ftpmanager_tools','cmd':'get_disk_info'})
+        #r=await wst.get(s)
         return web.json_response(r)
     
     async def ws_confirm_post(self,request):
@@ -106,7 +117,8 @@ class ftpmanager:
                 if json['uuid'] in wst.Queue:wst.Queue[json['uuid']].put_nowait(json['data'])
                 else:print('发生意料外的json反馈')
             else:
-                print(json)#处理其他情况
+                #处理其他情况
+                pass
         return ws
         # except asyncio.CancelledError:
         #     self.server_table[server_id]['status']=0
@@ -236,7 +248,6 @@ class ws_tool:
         self.ws=ws
     async def send(self,json,s=None):
         s=s or uuid.uuid1().hex
-        print(s)
         self.Queue[s]=asyncio.Queue(maxsize=1)
         await self.ws.send_json({'data':json,'uuid':s})
         return s
