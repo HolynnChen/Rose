@@ -178,9 +178,6 @@ class RedisConnect:
         self.decode_response=decode_responses
         self.c=aredis.StrictRedis(host=self.host, port=self.port)
 
-    def __len__(self):
-        return
-
     async def set(self, key, value):
         t = self.type(value)
         if t == "str" or t == "int":

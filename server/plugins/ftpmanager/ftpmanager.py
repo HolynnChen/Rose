@@ -9,6 +9,9 @@ from functools import wraps
 from aiohttp_session import get_session
 import time
 import re
+import hashlib
+
+APP_KEY='1234567890'
 
 gb.plugin_alert('FtpManager',{'introduction': 'Ftp远程管理模块', 'url_enable': True,'url':'ftpmanager','version':'1.0.0','name':'ftpmanager'})
 
@@ -32,6 +35,7 @@ class ftpmanager:
     __instance__ = None
     __helper__=None
     __user_table={}
+    __server_table={}
 
     def __new__(cls):
         if not cls.__instance__: cls.__instance__ = object.__new__(cls)
@@ -63,6 +67,38 @@ class ftpmanager:
     @manager_required    
     async def server_list_get(self,request):
         return web.json_response(self.__helper__.get_server_list())
+    
+    async def ws_confirm_post(self,request):
+        data = await request.post()
+        if not expect(data,['server_id','verify']):return web.json_response({'code':-1,'err_msg':'参数不完整'})
+        if hashlib.sha256((data['server_id']+APP_KEY).encode()).hexdigest()==data['verify']:
+            session=await get_session(request)
+            session['ftpmanager_verify']=True
+            session['server_id']=data['server_id']
+            return web.json_response({'code':0,'msg':'success'})
+        return web.json_response({'code':10001,'msg':'verify fail'})
+
+
+    async def ws_keep_get(self,request):
+        ws = web.WebSocketResponse(heartbeat=30, receive_timeout=60)
+        session=get_session(request)
+        if not session.get('ftpmanager_verify'):return
+        server_id=session['server_id']
+        self.__server_table[server_id]={'status':1}
+        self.__helper__.active_server(server_id)
+        await ws.prepare(request)
+        try:
+            async for msg in ws:
+                json = msg.json()
+            return ws
+        except asyncio.CancelledError:
+            self.__server_table[server_id]['status']=2
+            print('offline', server_id)
+            return ws
+        except:
+            self.__server_table[server_id]['status']=3
+            print('error', server_id)
+            return ws
 
 class sqlite_helper:
     __instance__ = None
@@ -138,13 +174,38 @@ class sqlite_helper:
         return cursor.execute(sql).fetchall()
     def search(self,table,filter_dict={},column_filter=None,fetchlimit=0,special_sql=None):
         cursor = self._db.cursor()
-        sql = special_sql or 'select {column_filter or "*"} from {table} '
-        if len(filter_dict) and not special_sql:sql+=' and '.join([i+'=:'+i for i in filter_dict.keys()])
+        sql = special_sql or f'select {column_filter or "*"} from {table}'
+        if len(filter_dict) and not special_sql:
+            sql+=' where '
+            sql+=' and '.join([i+'=:'+i for i in filter_dict.keys()])
         cursor.execute(sql,filter_dict)
         if fetchlimit<0:return self._warp(cursor.fetchall(),cursor.description)
         elif fetchlimit==0:return self._warp(cursor.fetchone(),cursor.description)
         else: return self._warp(cursor.fetchmany(fetchlimit),cursor.description)
+    def insert(self,table,dicts,special_sql=None):
+        cursor=self._db.cursor()
+        sql=special_sql or f'inser into {table} ({",".join(dicts.keys())}) values ({",".join([":"+i for i in dicts.keys()])})'
+        if isinstance(dicts,list):cursor.executemany(sql,dicts)
+        else:cursor.execute(sql,dicts)
+        self._db.commit()
+    def update(self,table,value_dict,filter_dict={},column_filter=None,special_sql=None):
+        cursor = self._db.cursor()
+        temp=",".join([i+'=?' for i in value_dict.keys()])
+        sql = special_sql or f'update {table} at {temp}'
+        if len(filter_dict) and not special_sql:
+            sql+=' where '
+            sql+=' and '.join([i+'=?' for i in filter_dict.keys()])
+        cursor.execute(sql,tuple(value_dict.values()+filter_dict.values()))
+        self._db.commit()
 
     def check_manager(self,username,password):
         key='mail' if re.match(r'^[\w]+[\w._]*@\w+\.[a-zA-Z]+$', username) else 'name'
         return self.search('manager',{key:password})
+    
+    def active_server(self,server_id):
+        if not self.search('server',{'server_id':server_id}):
+            self.insert('server',{'server_id':server_id,'status':1})
+            return
+        self.update('server',{'status':1},{'server_id':server_id})
+        
+            

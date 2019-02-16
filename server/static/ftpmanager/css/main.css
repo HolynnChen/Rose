@@ -1,0 +1,24 @@
+body{
+    height: 100vh;
+    width: 100vw;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+}
+.login{
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+}
+.login input{
+    width: 15vw;
+}
+.login_confirm{
+    display: flex;
+    justify-content: center;
+    align-items: center;
+}
+.login_confirm button{
+    width: 6vw;
+    height: 1.5vw;
+}
