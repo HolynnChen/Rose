@@ -237,3 +237,39 @@ def dic_multi_get(key_list,dic,default_value=None):return list(map(lambda x:dic.
 
 def plugin_alert(Name,object):
     plugin_table[Name] = object
+
+class async_Dict():
+    def __init__(self,loop=None):
+        self._loop=loop or asyncio.get_event_loop()
+        self._getters={}
+        self._dict={}
+        self._del={}
+    def set(self,key,value):
+        if key in self._del:
+            return self._dict.pop(key)
+        self._dict[key]=value
+        self._wakeup(key)
+    @asyncio.coroutine
+    def get(self,key):
+        while key not in self._dict:
+            getter=self._loop.create_future()
+            self._getters[key]=getter
+            try:
+                yield from getter
+            except:
+                getter.cancel()
+                try:
+                    del self._getters[key]
+                except KeyError:
+                    pass
+                raise
+        return self._dict.pop(key)
+    
+    def async_del(self,key):
+        if key in self._dict:del self._dict[key]
+        else:self._del[key]=True
+    def _wakeup(self,key):
+        if key in self._getters:
+            getter=self._getters.pop(key)
+            if not getter.done():
+                getter.set_result(None)

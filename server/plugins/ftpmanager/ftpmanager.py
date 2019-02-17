@@ -47,6 +47,7 @@ class ftpmanager:
     __user_table={}
     server_table={}
     __ws_table={}
+    __wst=None
 
     def __new__(cls):
         if not cls.__instance__: cls.__instance__ = object.__new__(cls)
@@ -54,6 +55,7 @@ class ftpmanager:
     def __init__(self):
         if self.__helper__:return
         self.__helper__=sqlite_helper()
+        self.__wst=ws_tool()
         print('FtpManager模块已启用')
     async def default_get(self,request):
         return await self.index_get(request)
@@ -80,12 +82,8 @@ class ftpmanager:
         return web.json_response(self.__helper__.get_server_list())
         
     async def test_get(self,request):
-        #wst=self.server_table['9ac6657de9dc19bd2b273857261362e9']['wst']
-        wsts=[self.server_table[i]['wst'] for i in self.server_table]
-        s=await sorted_wait([i.send({'type':'ftpmanager_tools','cmd':'get_disk_info'}) for i in wsts])
-        r=await sorted_wait([wsts[i].get(s[i]) for i in range(len(wsts))])
-        #s=await wst.send({'type':'ftpmanager_tools','cmd':'get_disk_info'})
-        #r=await wst.get(s)
+        ss=await self.__wst.send_all({'type':'ftpmanager_tools','cmd':'get_disk_info'})
+        r=await sorted_wait([self.__wst.get(i) for i in ss])
         return web.json_response(r)
     
     async def ws_confirm_post(self,request):
@@ -105,17 +103,15 @@ class ftpmanager:
         session=await get_session(request)
         if not expect(session,['ftpmanager_verify','server_id']) or not session.get('ftpmanager_verify'):return web.Response(status=404,reason='非法登陆')
         server_id=session['server_id']
-        wst=ws_tool(ws)
-        self.server_table[server_id]={'status':1,'wst':wst}
+        self.__wst.add(server_id,ws)
+        self.server_table[server_id]={'status':1}
         self.__helper__.active_server(server_id)
         # try:
         print('online',server_id)
         async for msg in ws:
             json = msg.json()
             if expect(json,['data','uuid']):
-                print(json)
-                if json['uuid'] in wst.Queue:wst.Queue[json['uuid']].put_nowait(json['data'])
-                else:print('发生意料外的json反馈')
+                self.__wst.set(json['uuid'],json['data'])
             else:
                 #处理其他情况
                 pass
@@ -242,25 +238,27 @@ class sqlite_helper:
     def change_server_status(self,server_id,status):self.update('server',{'status':status},{'server_id':server_id})
 
 class ws_tool:
-    ws=None
-    Queue={}
-    def __init__(self,ws):
-        self.ws=ws
-    async def send(self,json,s=None):
+    wss={}
+    ws_msg_dict=gb.async_Dict()
+    def __init__(self):self.wss={}
+    def add(self,key,ws):
+        self.wss[key]=ws
+    async def send(self,key,json,s=None):
         s=s or uuid.uuid1().hex
-        self.Queue[s]=asyncio.Queue(maxsize=1)
-        await self.ws.send_json({'data':json,'uuid':s})
+        await self.wss[key].send_json({'data':json,'uuid':s})
         return s
     async def get(self,s,timeout=5):
         try:
             async with async_timeout.timeout(timeout):
-                json=await self.Queue[s].get()
+                json=await self.ws_msg_dict.get(s)
                 return json
         except (asyncio.TimeoutError,asyncio.CancelledError):
+            self.ws_msg_dict.async_del(s)
             return None
-        finally:
-            del self.Queue[s]
-    async def respon(self,s,json):await self.send(json,s=s)
+    def set(self,s,v):self.ws_msg_dict.set(s,v)
+    async def respon(self,key,s,json):await self.send(key,json,s=s)
+    async def send_all(self,json):
+        return await sorted_wait([self.send(i,json) for i in self.wss])
 
         
             
