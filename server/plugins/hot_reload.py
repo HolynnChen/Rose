@@ -6,7 +6,7 @@ import asyncio
 import os,importlib,sys
 
 class hot_reload(RegexMatchingEventHandler):
-    def __init__(self,regs=[r".*.py"]):
+    def __init__(self,regs=[r".*.py$"]):
         RegexMatchingEventHandler.__init__(self,regexes=regs)
         self.reload_set=set()
     def on_modified(self, event):
