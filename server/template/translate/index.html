@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html>
+<head>
+	<title>自用翻译工具</title>
+	<link rel="stylesheet" type="text/css" media="screen" href="static/translate/css/normalize.css">
+	<link rel="stylesheet" type="text/css" media="screen" href="static/translate/css/main.css">
+	<script src="/static/translate/js/jquery.min.js"></script>
+	<script src="/static/translate/js/vue.min.js"></script>
+	<script src="/static/translate/js/main.js"></script>
+</head>
+<body>
+	<div class="container" id="app">
+		<div class="info">
+			<div class="title">自用翻译工具</div>
+			<div class="version" title='更新时间：2018.11.22 09:54'>v0.45</div>
+		</div>
+		<div class="input" v-if='input'>
+			<textarea id='translate_input' placeholder="输入原文，建议一行一句，隔一行一段"></textarea>
+			<div>
+				<button id='translate_start' @click='submit'>开始翻译</button>
+				<button @click='re_trans' title="正则匹配进行分句，可能存在少许错误，记得要检查哦">整理文章</button>
+				<button @click='back' v-if='origin'>数据恢复</button>
+			</div>
+		</div>
+		<div class="select_and_comfirm" v-else>
+			<p class="Tips">Tips:最左是原文(双击可修改，再双击确认修改)，中间是各种翻译，点击自己喜欢的翻译就可出现在最右的确认框中，还可以在确认框中修改自己不满意的地方哦~</p>
+			<div class="select_area" v-for="item in text">
+				<p class="origin_text" :id="'origin_'+item[0]" @dblclick='change(item[0])'>{{item[1]}}</p>
+				<p class="youdao_text" @click='choice(item[0],item[2])' v-if='item[2]'>{{item[2]}}</p>
+				<p class="google_text" @click='choice(item[0],item[3])' v-if='item[3]'>{{item[3]}}</p>
+				<div contenteditable="true" class="change_text" :id="'textarea_'+item[0]"></div>
+			</div>
+			<div class="get_result_container">
+				<button class="get_result" @click='get_result'>获取结果</button>
+			</div>
+		</div>
+		<div class="mask mask_hidden">
+			<div class="mask_container">加载中，请不要担心哦~</div>
+		</div>
+	</div>
+</body>
+<script src="/static/translate/js/main.js"></script>
+</html>

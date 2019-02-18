@@ -3,17 +3,31 @@
     <head>
         <link rel="stylesheet" type="text/css" href="/static/ftpmanager/css/normalize.css">
         <link rel="stylesheet" type="text/css" href="/static/ftpmanager/css/main.css">
-        <script src="https://cdn.bootcss.com/jquery/3.3.1/jquery.min.js"></script>
+        <script type="text/javascript" src="/static/cms/js/jquery.min.js"></script>
         <script type="text/javascript" src="/static/ftpmanager/js/main.js"></script>
     </head>
     <body>
-        <div class="logo"></div>
+        <div class="logo">
+            <img src="/static/ftpmanager/img/logo.png">
+            <p>Hope FTP在线管理系统</p>
+        </div>
         <div class="login">
             <input id="user" type="text" placeholder="请输入您的用户名或注册邮箱">
             <input id="password" type="password" placeholder="请输入您的密码">
             <div class="login_confirm">
-                <button>
+                <button>登录</button>
             </div>
         </div>
     </body>
+    <script type="text/javascript">
+        window.onload=init
+        function init(){
+            document.querySelector('.login_confirm button').addEventListener('click',()=>{
+                fetch_post('/ftpmanager/login',{
+                    username:user.value,
+                    password:password.value,
+                }).then(data=>console.log(data))
+            })
+        }
+    </script>
 </html>

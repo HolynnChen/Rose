@@ -1,6 +1,7 @@
 from rose import gb
 from rose.helper import template
 from aiohttp import web
+import aiohttp
 import jinja2
 import datetime
 import asyncio
@@ -17,18 +18,20 @@ APP_KEY='1234567890'
 
 gb.plugin_alert('FtpManager',{'introduction': 'Ftp远程管理模块', 'url_enable': True,'url':'ftpmanager','version':'1.0.0','name':'ftpmanager'})
 
+
 def manager_required(func):  # 用户登录状态校验
     @wraps(func)
-    async def inner(cls,request, *args, **kwargs):
+    async def inner(cls, request, *args, **kwargs):
         session = await get_session(request)
         uid = session.get('uid')
-        obj=ftpmanager()
-        if uid and uid in obj.__user_table[uid] and int(time.time()) - obj.__user_table[uid] < 3600:
-            obj.__user_table[uid]['pass_time'] = int(time.time())
-            return await func(cls, *args, **kwargs)
+        obj = ftpmanager()
+        if uid and uid in obj._user_table and int(time.time()) - session['pass_time'] < 3600:
+            session['pass_time'] = int(time.time())
+            return await func(cls,request, *args, **kwargs)
         else:
-            if uid and uid in obj.__user_table: del obj.__user_table[uid]
+            if uid and uid in obj._user_table: del obj._user_table[uid]
             return web.Response(status=302, headers={'location': '/ftpmanager/login'})
+
     return inner
 
 def expect(data,target):return all([i in data for i in target])
@@ -36,7 +39,7 @@ def expect(data,target):return all([i in data for i in target])
 async def sorted_wait(tasks):
     async def index(i,task):
         result=await task
-        return i,result
+        return i,result 
     s,_=await asyncio.wait([index(i,tasks[i]) for i in range(len(tasks))])
     s=list(map(lambda x:x[1],sorted([i.result() for i in s],key=lambda x:x[0])))
     return s
@@ -44,7 +47,7 @@ async def sorted_wait(tasks):
 class ftpmanager:
     __instance__ = None
     __helper__=None
-    __user_table={}
+    _user_table={}
     server_table={}
     __ws_table={}
     __wst=None
@@ -57,8 +60,11 @@ class ftpmanager:
         self.__helper__=sqlite_helper()
         self.__wst=ws_tool()
         print('FtpManager模块已启用')
+
+
     async def default_get(self,request):
         return await self.index_get(request)
+
     @manager_required
     @template('/ftpmanager/index.html')
     async def index_get(self,request):
@@ -69,10 +75,13 @@ class ftpmanager:
         return
     async def login_post(self,request):
         data = await request.post()
-        if not expect(data,['username''password']):return web.json_response({'code':-1,'err_msg':'参数不完整'})
+        if not expect(data,['username','password']):return web.json_response({'code':-1,'err_msg':'参数不完整'})
         user=self.__helper__.check_manager(data['username'],data['password'])
         if user:
-            self.__user_table[user['id']]=user
+            self._user_table[user['id']]=user
+            session = await get_session(request)
+            session['uid']=user['id']
+            session['pass_time'] = int(time.time())
             return web.json_response({'code':302,'redirect':'/ftpmanager/index'})
         else:
             return web.json_response({'code':10001,'msg':'账号或密码错误'})
@@ -216,11 +225,11 @@ class sqlite_helper:
         if isinstance(dicts,list):cursor.executemany(sql,dicts)
         else:cursor.execute(sql,dicts)
         self._db.commit()
-    def update(self,table,value_dict,filter_dict={},column_filter=None,special_sql=None):
+    def update(self,table,value_dict,filter_dict=None,special_sql=None):
         cursor = self._db.cursor()
         temp=",".join([i+'=?' for i in value_dict.keys()])
         sql = special_sql or f'update {table} set {temp}'
-        if len(filter_dict) and not special_sql:
+        if filter_dict and len(filter_dict) and not special_sql:
             sql+=' where '
             sql+=' and '.join([i+'=?' for i in filter_dict.keys()])
         cursor.execute(sql,tuple(list(value_dict.values())+list(filter_dict.values())))
@@ -241,8 +250,8 @@ class ws_tool:
     wss={}
     ws_msg_dict=gb.async_Dict()
     def __init__(self):self.wss={}
-    def add(self,key,ws):
-        self.wss[key]=ws
+    def add(self,key,ws):self.wss[key]=ws
+    def server_id_list(self):return list(self.wss.keys())
     async def send(self,key,json,s=None):
         s=s or uuid.uuid1().hex
         await self.wss[key].send_json({'data':json,'uuid':s})

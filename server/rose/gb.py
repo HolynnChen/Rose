@@ -6,6 +6,7 @@ from functools import update_wrapper
 import asyncio
 import async_timeout
 import random,string,uuid
+import sys,os
 
 var={}
 plugin_table={}
@@ -21,21 +22,30 @@ def init():
     var['templateFuncClassDic']={}
     var['init']=[]
     var['application']={}
-    __add_class_func_to_local__(var["global_route"], ['addClass', 'add_rewrite_rule','route_rewrite','addRoute'])
+    #__add_class_func_to_local__(var["global_route"], ['addClass', 'add_rewrite_rule','route_rewrite','addRoute'])
 
 def update(key,value):
     var[key]=value
 '''
 暴露函数声明区
 '''
-global addClass,add_rewrite_rule,route_rewrite,addRoute
+#global addClass,add_rewrite_rule,route_rewrite,addRoute
+def addClass(*arg,**krgs):return var['global_route'].addClass(*arg,**krgs)
+def add_rewrite_rule(*arg,**krgs):return var['global_route'].add_rewrite_rule(*arg,**krgs)
+def route_rewrite(*arg,**krgs):return var['global_route'].route_rewrite(*arg,**krgs)
+def addRoute(*arg,**krgs):return var['global_route'].addRoute(*arg,**krgs)
+def delClass(*arg,**krgs):return var['global_route'].delClass(*arg,**krgs)
 
 async def worker():
-    var['worklist']=asyncio.Queue()
     print('start worker list')
     getType=lambda x:type(x).__name__
     while True:
-        work=await var['worklist'].get()
+        work=None
+        try:
+            async with async_timeout.timeout(1):
+                work = await var['worklist'].get()
+        except (asyncio.TimeoutError, asyncio.CancelledError):
+            continue
         t=getType(work)
         if t=='function':
             await work()
@@ -64,12 +74,13 @@ async def worker():
                 await work['recv'](temp)
 
 
-async def put_work(func):
-    if str(type(func)).split("'")[1]=='list':
+def put_work(func):
+    if isinstance(func,list):
         for i in func:
-            await var['worklist'].put_nowait(i)
+            var['worklist'].put_nowait(i)
         return
-    await var['worklist'].put_nowait(func)
+    var['worklist'].put_nowait(func)
+    print(var['worklist'])
 
 def admin_login_required(func):  # 用户登录状态校验 该子程序仅用于示例，若您需要使用用户登录校验请自行复制到模块开头或进行修改
     @wraps(func)
@@ -139,20 +150,30 @@ class route:
         self.variableRoutes={}
         self.regUrls=[]
         self.getRandom=lambda :str(uuid.uuid4())
-    def addClass(self,controllerClass,parentClassName='')->None:#应当能够匹配多层嵌套的class
+        self.templist=[]
+        self.mapping={}
+    def addClass(self,controllerClass,parentClassName='',ApplicationName=None)->None:#应当能够匹配多层嵌套的class
+        ApplicationName=ApplicationName or controllerClass.__name__
+        if not controllerClass.__name__ in self.mapping:
+            for i in self.templist:
+                if sys._getframe(2).f_code.co_filename.startswith(i):
+                    self.mapping[controllerClass.__name__]=i
+                    self.templist.remove(i)
+                    break
         if len(self.regUrls)==0:self.regUrls=list(map(lambda x:(x.path,x.method),var['routes']._items))
         className=str(getattr(controllerClass,'__alias__',controllerClass.__name__))
         if className=="variable":
             route_variable_name=getattr(controllerClass,'__variable_name__',self.getRandom())
             className='{'+route_variable_name+'}'
-        theRandom=self.getRandom()
+        #theRandom=self.getRandom()
         shortName=f'{(parentClassName.replace("/",".")+"."+className) if parentClassName!="" else className}'
-        var['application'][shortName]=controllerClass()
-        easy=var['application'][shortName]
+        if ApplicationName not in var['application']:var['application'][ApplicationName]={}
+        var['application'][ApplicationName][shortName]=controllerClass()
+        easy=var['application'][ApplicationName][shortName]
         for i in filter(lambda x:not x.startswith('_'),dir(easy)):
             theType=type(getattr(easy,i)).__name__
             if theType=='type':
-                self.addClass(getattr(easy,i),f'/{className}' if not parentClassName else f'{parentClassName}/{className}')
+                self.addClass(getattr(easy,i),f'/{className}' if not parentClassName else f'{parentClassName}/{className}',ApplicationName=ApplicationName)
                 continue
             elif not theType in ["function","method"]:
                 continue
@@ -163,15 +184,20 @@ class route:
                     elif name=="default":name=''
                     url=self.route_rewrite(name,className,parentClassName)
                     if len(list(filter(lambda m:m[0]==url and (m[1]==j or m[1]=='*'),self.regUrls))):raise ValueError
-                    self.regUrls.append((url,j))
-                    self.routes.append(getattr(web,j)(url,self.wrap(getattr(easy,i),easy)))
+                    self.regUrls.append((url,j,ApplicationName))
+                    self.routes.append(getattr(web,j)(url,self.wrap(getattr(easy,i),easy,ApplicationName=ApplicationName)))
                     if not name and url[:-1]:
                         url=url[:-1]
                         if len(list(filter(lambda m: m[0] == url and (m[1] == j or m[1] == '*'),self.regUrls))): break
-                        self.regUrls.append((url, j))
-                        self.routes.append(getattr(web, j)(url, self.wrap(getattr(easy, i), easy)))
-                    break
+                        self.regUrls.append((url, j,ApplicationName))
+                        self.routes.append(getattr(web, j)(url, self.wrap(getattr(easy, i), easy,ApplicationName=ApplicationName)))
         return
+    def delClass(self,ApplicationName):
+        if len(self.routes):self.routes=list(filter(lambda x:not x.handler.__doc__==ApplicationName,self.routes))
+        if len(self.regUrls):
+            print(self.regUrls)
+            self.regUrls=list(filter(lambda x:not x[2]==ApplicationName,self.regUrls))
+        if ApplicationName in var['application']:del var['application'][ApplicationName]
     def addRoute(self,func,url,method,prefix=""):
         name=func.__name__
         if name.startswith('_'):raise NameError("don't start with '_' in the func name")
@@ -198,7 +224,7 @@ class route:
             raise ValueError
         self.rule.append(tmp)
         return True
-    def wrap(self,func,itsclass=None):#修复继承关系
+    def wrap(self,func,itclass=None,ApplicationName=None):#修复继承关系
         async def inner(request):
             url=str(request._rel_url)
             temp={}
@@ -217,7 +243,7 @@ class route:
             #    print(e)
             #    return web.Response(text="抱歉，您所访问的应用出错了")
             return await func(request)
-
+        inner.__doc__=ApplicationName
         inner.__name__=func.__name__#进行名字修复
         return inner
 def __add_class_func_to_local__(obj,func_list):
@@ -239,18 +265,28 @@ def plugin_alert(Name,object):
     plugin_table[Name] = object
 
 class async_Dict():
+    '''使用该类可作为异步字典。写入是实时的，获取是异步的。支持异步del，可用于超时删除。'''
     def __init__(self,loop=None):
         self._loop=loop or asyncio.get_event_loop()
         self._getters={}
         self._dict={}
         self._del={}
     def set(self,key,value):
+        '''实时写入
+        :param key:字典的key
+        :param value: 字典的value
+        :return: None
+        '''
         if key in self._del:
             return self._dict.pop(key)
         self._dict[key]=value
         self._wakeup(key)
     @asyncio.coroutine
     def get(self,key):
+        '''异步写入
+        :param key: 字典的key
+        :return: None
+        '''
         while key not in self._dict:
             getter=self._loop.create_future()
             self._getters[key]=getter

@@ -2,8 +2,26 @@ body{
     height: 100vh;
     width: 100vw;
     display: flex;
+    flex-direction: column;
     justify-content: center;
     align-items: center;
+    background-color: #33A6B8
+}
+.logo{
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    margin-bottom: 2vw;
+    margin-top:-2vw;
+}
+.logo img{
+    height: 6vw;
+    width: 6vw;
+}
+.logo p{
+    color:#fff;
+    text-shadow: 0 0 0.5vw rgba(254,223,225,0.8);
+    font-size: 1vw;
 }
 .login{
     display: flex;
@@ -11,7 +29,21 @@ body{
     justify-content: center;
 }
 .login input{
-    width: 15vw;
+    width: 13vw;
+    height: 1.5vw;
+    border-radius: 0.75vw;
+    padding: 0 0.5vw;
+    margin-bottom: 0.5vw;
+    border: 0;
+    outline: none;
+    transition: all 0.5s;
+}
+.login input::placeholder{
+    font-size: 0.7vw;
+    color:rgba(0,0,0,.6)
+}
+.login input:focus{
+    box-shadow: 0 0 15px 5px rgba(0,137,167,.3)
 }
 .login_confirm{
     display: flex;
@@ -19,6 +51,17 @@ body{
     align-items: center;
 }
 .login_confirm button{
-    width: 6vw;
+    width: 5vw;
     height: 1.5vw;
+    border-radius: 0.75vw;
+    border: 0px;
+    outline: none;
+    background-size: 400% 100%;
+    background-image: linear-gradient(to right,#FFFFFB 0%,#FFFFFB 25%,#F596AA 75%,#F596AA 100%);
+    background-position-x: 0%;
+    transition: all 0.5s
+}
+.login_confirm button:hover{
+    background-position-x:100%; 
+    color: #fff
 }
