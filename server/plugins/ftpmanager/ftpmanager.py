@@ -268,6 +268,3 @@ class ws_tool:
     async def respon(self,key,s,json):await self.send(key,json,s=s)
     async def send_all(self,json):
         return await sorted_wait([self.send(i,json) for i in self.wss])
-
-        
-            

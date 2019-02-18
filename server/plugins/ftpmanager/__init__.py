@@ -1,3 +1,6 @@
+__all__=['ftpmanager']
+from . import ftpmanager
 from rose import gb
-from .ftpmanager import ftpmanager
-gb.addClass(ftpmanager)
+import importlib
+importlib.reload(ftpmanager)
+gb.addClass(ftpmanager.ftpmanager)

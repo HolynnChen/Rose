@@ -80,7 +80,6 @@ def put_work(func):
             var['worklist'].put_nowait(i)
         return
     var['worklist'].put_nowait(func)
-    print(var['worklist'])
 
 def admin_login_required(func):  # 用户登录状态校验 该子程序仅用于示例，若您需要使用用户登录校验请自行复制到模块开头或进行修改
     @wraps(func)
@@ -194,9 +193,7 @@ class route:
         return
     def delClass(self,ApplicationName):
         if len(self.routes):self.routes=list(filter(lambda x:not x.handler.__doc__==ApplicationName,self.routes))
-        if len(self.regUrls):
-            print(self.regUrls)
-            self.regUrls=list(filter(lambda x:not x[2]==ApplicationName,self.regUrls))
+        if len(self.regUrls):self.regUrls=list(filter(lambda x:not x[2]==ApplicationName,self.regUrls))
         if ApplicationName in var['application']:del var['application'][ApplicationName]
     def addRoute(self,func,url,method,prefix=""):
         name=func.__name__

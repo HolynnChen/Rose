@@ -3,7 +3,7 @@ from watchdog.observers import Observer
 from watchdog.events import RegexMatchingEventHandler
 from rose import configloader as co
 import asyncio
-import os,imp,sys
+import os,importlib,sys
 
 class hot_reload(RegexMatchingEventHandler):
     def __init__(self,regs=[r".*.py"]):
@@ -30,8 +30,8 @@ class hot_reload(RegexMatchingEventHandler):
                 print(f'热加载{i}发生意外')
                 return
             print(f'热加载{i}中')
-            imp.reload(sys.modules[f'plugins.{i}'])
-        gb.var['app_loop'].stop()
+            importlib.reload(sys.modules[f'plugins.{i}'])
+        gb.var['app_loop'].call_soon_threadsafe(gb.var['app_loop'].stop)
         print(f'热加载完毕，重启应用中')
         pass
 async def obs():

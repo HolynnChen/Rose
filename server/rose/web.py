@@ -16,6 +16,7 @@ except ImportError:
 gb.init()
 from aiohttp import web
 from threading import Thread
+import importlib
 
 def load_plugin():
     enable_list=co.config.get('enable_plugin',[])
@@ -23,11 +24,11 @@ def load_plugin():
         for i in dirs:
             if os.path.exists(f'plugins/{i}/__init__.py') and i in enable_list:
                 gb.var['global_route'].templist.append(os.path.abspath(f'plugins/{i}'))
-                __import__(f'plugins.{i}')
+                importlib.import_module('.'+i,package='plugins')
         for i in files:
             if not i=='__init__.py' and i.split('.')[0] in enable_list:
                 gb.var['global_route'].templist.append(os.path.abspath(f'plugins/{i.split(".")[0]}'))
-                __import__('plugins.'+i.split('.')[0])
+                importlib.import_module('.'+i.split('.')[0],package='plugins')
         break
     
 
@@ -78,11 +79,9 @@ def server_start(devmode=False):
         gb.var['app_loop']=loop
         print(f'======== Running on {srv.sockets[0].getsockname()} ========')
         loop.run_forever()
-        print('应用已关闭')
+        print('应用已关闭，准备重启')
         srv.close()
-        print('准备清理工作')
         loop.run_until_complete(srv.wait_closed())
         loop.run_until_complete(app.shutdown())
-        print('清理工作已完成，准备重启')
 
 
