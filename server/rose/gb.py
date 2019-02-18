@@ -160,7 +160,7 @@ class route:
                     self.mapping[controllerClass.__name__]=i
                     self.templist.remove(i)
                     break
-        if len(self.regUrls)==0:self.regUrls=list(map(lambda x:(x.path,x.method),var['routes']._items))
+        if len(self.regUrls)==0:self.regUrls=list(map(lambda x:(x.path,x.method,None),var['routes']._items))
         className=str(getattr(controllerClass,'__alias__',controllerClass.__name__))
         if className=="variable":
             route_variable_name=getattr(controllerClass,'__variable_name__',self.getRandom())
