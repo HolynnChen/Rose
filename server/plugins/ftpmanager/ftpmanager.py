@@ -11,11 +11,11 @@ from aiohttp_session import get_session
 import time
 import re
 import hashlib
-import uuid
+import uuid,sys,traceback
 import async_timeout
 
 APP_KEY='1234567890'
-
+__all__=['ftpmanager']
 gb.plugin_alert('FtpManager',{'introduction': 'Ftp远程管理模块', 'url_enable': True,'url':'ftpmanager','version':'1.0.0','name':'ftpmanager'})
 
 
@@ -60,10 +60,15 @@ class ftpmanager:
         self.__helper__=sqlite_helper()
         self.__wst=ws_tool()
         print('FtpManager模块已启用')
+    def __del__(self):
+        print('触发析构')
 
 
     async def default_get(self,request):
         return await self.index_get(request)
+    # async def hi_get(self,request):
+    #     print(self)
+    #     return web.Response(text='hi')
 
     @manager_required
     @template('/ftpmanager/index.html')

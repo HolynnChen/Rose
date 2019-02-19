@@ -6,7 +6,7 @@ from functools import update_wrapper
 import asyncio
 import async_timeout
 import random,string,uuid
-import sys,os
+import sys,os,importlib
 
 var={}
 plugin_table={}
@@ -35,6 +35,24 @@ def add_rewrite_rule(*arg,**krgs):return var['global_route'].add_rewrite_rule(*a
 def route_rewrite(*arg,**krgs):return var['global_route'].route_rewrite(*arg,**krgs)
 def addRoute(*arg,**krgs):return var['global_route'].addRoute(*arg,**krgs)
 def delClass(*arg,**krgs):return var['global_route'].delClass(*arg,**krgs)
+
+
+async def Timer():
+    loop=asyncio.get_event_loop()
+    while True:
+        try:
+            async with async_timeout.timeout(1):
+                func,time = await var['Timer'].get()
+                loop.call_later(time,Timer_add,func,time)
+                if asyncio.iscoroutinefunction(func):
+                    loop.call_later(time,asyncio.ensure_future,func)
+                else:
+                    loop.call_later(time,func)
+        except (asyncio.TimeoutError, asyncio.CancelledError):
+            continue
+
+def Timer_add(func,time):var['Timer'].put_nowait((func,time))
+
 
 async def worker():
     print('start worker list')
@@ -149,16 +167,12 @@ class route:
         self.variableRoutes={}
         self.regUrls=[]
         self.getRandom=lambda :str(uuid.uuid4())
-        self.templist=[]
+        self.tempmap={}
         self.mapping={}
     def addClass(self,controllerClass,parentClassName='',ApplicationName=None)->None:#应当能够匹配多层嵌套的class
-        ApplicationName=ApplicationName or controllerClass.__name__
-        if not controllerClass.__name__ in self.mapping:
-            for i in self.templist:
-                if sys._getframe(2).f_code.co_filename.startswith(i):
-                    self.mapping[controllerClass.__name__]=i
-                    self.templist.remove(i)
-                    break
+        if not ApplicationName and not controllerClass.__name__ in self.mapping:
+            ApplicationName=ApplicationName or controllerClass.__name__
+            self.mapping[controllerClass.__module__]=self.tempmap.pop(controllerClass.__module__)
         if len(self.regUrls)==0:self.regUrls=list(map(lambda x:(x.path,x.method,None),var['routes']._items))
         className=str(getattr(controllerClass,'__alias__',controllerClass.__name__))
         if className=="variable":
@@ -192,9 +206,14 @@ class route:
                         self.routes.append(getattr(web, j)(url, self.wrap(getattr(easy, i), easy,ApplicationName=ApplicationName)))
         return
     def delClass(self,ApplicationName):
-        if len(self.routes):self.routes=list(filter(lambda x:not x.handler.__doc__==ApplicationName,self.routes))
-        if len(self.regUrls):self.regUrls=list(filter(lambda x:not x[2]==ApplicationName,self.regUrls))
-        if ApplicationName in var['application']:del var['application'][ApplicationName]
+        #if len(self.routes):
+        self.routes=list(filter(lambda x:not x.handler.__doc__==ApplicationName,self.routes))
+        #if len(self.regUrls):
+        self.regUrls=list(filter(lambda x:not x[2]==ApplicationName,self.regUrls))
+        if ApplicationName in var['application']:
+            for i in list(var['application'][ApplicationName].keys()):
+                var['application'][ApplicationName].pop(i)
+            var['application'].pop(ApplicationName)
     def addRoute(self,func,url,method,prefix=""):
         name=func.__name__
         if name.startswith('_'):raise NameError("don't start with '_' in the func name")
@@ -261,6 +280,10 @@ def dic_multi_get(key_list,dic,default_value=None):return list(map(lambda x:dic.
 def plugin_alert(Name,object):
     plugin_table[Name] = object
 
+def add_mini_mod(mini_mod):
+    var['global_route'].tempmap[mini_mod.__name__]=mini_mod.__file__
+    for i in getattr(mini_mod,'__all__',[]):addClass(getattr(mini_mod,i))
+
 class async_Dict():
     '''使用该类可作为异步字典。写入是实时的，获取是异步的。支持异步del，可用于超时删除。'''
     def __init__(self,loop=None):
@@ -306,3 +329,5 @@ class async_Dict():
             getter=self._getters.pop(key)
             if not getter.done():
                 getter.set_result(None)
+class ServerSignal_rebot(Exception):
+    pass

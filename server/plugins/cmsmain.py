@@ -218,4 +218,5 @@ class cmstool_mongo:
             return '#'
 gb.add_rewrite_rule(['replace_start','/cms',''])
 gb.addClass(cms)
+#__all__=['cms']
 gb.addTemplateFuncClass(cmstool_mysql if db=='mysql' else cmstool_mongo)

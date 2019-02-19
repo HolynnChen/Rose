@@ -18,16 +18,16 @@
                 <button>登录</button>
             </div>
         </div>
+        <script type="text/javascript">
+            window.onload=init
+            function init(){
+                document.querySelector('.login_confirm button').addEventListener('click',()=>{
+                    fetch_post('/ftpmanager/login',{
+                        username:user.value,
+                        password:password.value,
+                    }).then(data=>console.log(data))
+                })
+            }
+        </script>
     </body>
-    <script type="text/javascript">
-        window.onload=init
-        function init(){
-            document.querySelector('.login_confirm button').addEventListener('click',()=>{
-                fetch_post('/ftpmanager/login',{
-                    username:user.value,
-                    password:password.value,
-                }).then(data=>console.log(data))
-            })
-        }
-    </script>
 </html>

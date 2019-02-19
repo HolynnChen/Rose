@@ -6,7 +6,7 @@ import aiohttp_jinja2
 import rose.configloader as co
 import time
 from aiohttp_session import get_session
-
+__all__=['admin']
 gb.plugin_table["管理"] = {'introduction': '总管各类插件的应用', 'url_enable': True,'url':'admin','version':'1.0.0','name':'admin','hidden':True}
 
 def admin_login_required(func):  # 用户登录状态校验
@@ -77,4 +77,3 @@ class admin:
             return web.json_response({'code':302,'msg':'login success','data':{'url':'/admin/index'}})
         else:
             return gb.efc(10001)
-gb.addClass(admin)
