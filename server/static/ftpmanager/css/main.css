@@ -65,3 +65,43 @@ body{
     background-position-x:100%; 
     color: #fff
 }
+.main{
+    height: 100vh;
+    width: 100vw;
+    display: flex;
+    flex-direction: column;
+}
+.main_header{
+    height: 4vw;
+    background-color: #fff;
+    border:solid 1px #e6e6e6;
+    display: flex;
+    align-items: center;
+    box-sizing: border-box;
+}
+.main_header img{
+    width: 3.2vw;
+    height: 3.2vw;
+    padding: 0.4vw
+}
+.main_header p{
+    font-size: 1.5vw;
+    color: #2EA9DF;
+    text-shadow: 0 0 2px rgba(0,0,0,.4)
+}
+.main_body{
+    display: flex;
+    flex:1
+}
+.main_body_menu{
+    display: flex;
+}
+.main_menu{
+    max-width: 8vw;
+    height: 100%;
+    /*transition: all 0.5s!important*/
+}
+.main_body_content{
+    height: 100%;
+    width: 100%
+}

@@ -1,10 +1,55 @@
 <!DOCTYPE html>
-<html lang="en">
+<html>
 <head>
+    <link rel="stylesheet" type="text/css" href="/static/ftpmanager/css/normalize.css">
+    <link href="https://cdn.bootcss.com/element-ui/2.5.4/theme-chalk/index.css" rel="stylesheet">
+    <link rel="stylesheet" type="text/css" href="/static/ftpmanager/css/main.css">
+    <script src="https://cdn.bootcss.com/vue/2.6.4/vue.min.js"></script>
+    <script src="https://cdn.bootcss.com/element-ui/2.5.4/index.js"></script>
+    <script type="text/javascript" src="/static/ftpmanager/js/main.js"></script>
     <meta charset="UTF-8">
-    <title>Ftpmanager</title>
+    <title>Ftpmanager管理页面</title>
 </head>
 <body>
-This is a test.
+    <div class="main" id="main_app">
+        <div class="main_header">
+            <img src="/static/ftpmanager/img/logo.png">
+            <p>FtpManager管理系统</p>
+        </div>
+        <div class="main_body">
+            <div class="main_body_menu">
+                <el-menu class="main_menu" :collapse="menu.isCollapse">
+                    <el-menu-item index="1">
+                        <i class="el-icon-menu"></i>
+                        <span slot="title">主菜单</span>
+                    </el-menu-item>
+                    <el-menu-item index="999" @click="menu_toggle">
+                        <i :class="{'el-icon-caret-bottom':menu.isCollapse,'el-icon-caret-top':!menu.isCollapse}"></i>
+                        <span slot="title">{{menu.isCollapse?"展开":"收起"}}</span>
+                    </el-menu-item>
+                </el-menu>
+            </div>
+            <div class="main_body_content">
+                <div class="main_app_index">
+                    
+                </div>
+            </div>
+        </div>
+    </div>
+    <script>
+        var app=new Vue({
+            el:'#main_app',
+            data:{
+                menu:{
+                    isCollapse:true,
+                }
+            },
+            methods: {
+                menu_toggle:function(){
+                    this.menu.isCollapse=!this.menu.isCollapse
+                }
+            },
+        })
+    </script>
 </body>
 </html>

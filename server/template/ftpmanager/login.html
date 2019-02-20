@@ -2,8 +2,10 @@
 <html>
     <head>
         <link rel="stylesheet" type="text/css" href="/static/ftpmanager/css/normalize.css">
+        <link href="https://cdn.bootcss.com/element-ui/2.5.4/theme-chalk/index.css" rel="stylesheet">
         <link rel="stylesheet" type="text/css" href="/static/ftpmanager/css/main.css">
-        <script type="text/javascript" src="/static/cms/js/jquery.min.js"></script>
+        <script src="https://cdn.bootcss.com/vue/2.6.4/vue.min.js"></script>
+        <script src="https://cdn.bootcss.com/element-ui/2.5.4/index.js"></script>
         <script type="text/javascript" src="/static/ftpmanager/js/main.js"></script>
     </head>
     <body>
@@ -11,23 +13,46 @@
             <img src="/static/ftpmanager/img/logo.png">
             <p>Hope FTP在线管理系统</p>
         </div>
-        <div class="login">
-            <input id="user" type="text" placeholder="请输入您的用户名或注册邮箱">
-            <input id="password" type="password" placeholder="请输入您的密码">
-            <div class="login_confirm">
+        <div class="login" id="login">
+            <input id="user" v-model.trim="user" type="text" placeholder="请输入您的用户名或注册邮箱">
+            <input id="password" v-model.trim="password" type="password" placeholder="请输入您的密码">
+            <div class="login_confirm" @click="loginflag && login()">
                 <button>登录</button>
             </div>
         </div>
+        <script src="https://cdn.bootcss.com/crypto-js/3.1.9-1/crypto-js.min.js"></script>
         <script type="text/javascript">
-            window.onload=init
-            function init(){
-                document.querySelector('.login_confirm button').addEventListener('click',()=>{
-                    fetch_post('/ftpmanager/login',{
-                        username:user.value,
-                        password:password.value,
-                    }).then(data=>console.log(data))
-                })
-            }
+            var app=new Vue({
+                el:'#login',
+                data:{user:'',password:'',loginflag:true},
+                methods: {
+                    login:function(){
+                        let self=this
+                        if(!self.user){
+                            self.$message.warning("请输入用户名")
+                        }else if(!self.password){
+                            self.$message.warning("请输入密码")
+                        }else if(self.user.length>20 && self.user.length<5){
+                            self.$message.warning("用户名长度应当在5-20之间")
+                        }else if(self.password.length>20 && self.password.length<5){
+                            self.$message.warning("密码长度应当在5-20之间")
+                        }else{
+                            fetch_post(window.location.href,{
+                                username:self.user,
+                                password:CryptoJS.SHA256(self.password)
+                            }).then(res=>{
+                                if(res.code==10001 || res.code==-1){
+                                    self.$message.error(res.msg)
+                                }else if (res.code==302){
+                                    self.$message.success('登录成功，即将跳转')
+                                    self.loginflag=false
+                                    setTimeout(_=>window.location.href=res.redirect,1500)
+                                }
+                            })
+                        }
+                    }
+                },
+            })
         </script>
     </body>
 </html>

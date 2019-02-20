@@ -92,11 +92,16 @@ def server_start(devmode=False):
             print(f'======== Running on {site._host}:{site._port} ========')
             loop.run_forever()
             print('应用已关闭，准备重启')
+            loop.run_until_complete(site.stop())
             loop.run_until_complete(runner.cleanup())
+            del app,site,runner
             gc.collect()
-        except:
+        except Exception as e:
+            print(str(e))
             print('未知错误')
+            loop.run_until_complete(site.stop())
             loop.run_until_complete(runner.cleanup())
+            del app,site,runner
             break
 
 
