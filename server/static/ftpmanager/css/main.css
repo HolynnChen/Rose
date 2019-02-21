@@ -1,11 +1,19 @@
-body{
-    height: 100vh;
+html{
+    height: 100%;
     width: 100vw;
+}
+html::-webkit-scrollbar{
+    display: none;
+}
+body{
+    width: 100vw;
+    height: 100%;
     display: flex;
     flex-direction: column;
     justify-content: center;
     align-items: center;
-    background-color: #33A6B8
+    background-color: #33A6B8;
+    background-image: url('../img/texture.png')
 }
 .logo{
     display: flex;
@@ -66,9 +74,9 @@ body{
     color: #fff
 }
 .main{
-    height: 100vh;
     width: 100vw;
     display: flex;
+    height: 100%;
     flex-direction: column;
     background-image: url('../img/texture.png')
 }
@@ -115,6 +123,58 @@ body{
     font-size: 1.2vw;
 }
 .main_app_index .index_card{
-    width: 15vw;
+    width: 18vw;
     margin: 2vw;
+    max-height: 65vh;
+    overflow-y: scroll;
+}
+.main_app_index .index_card::-webkit-scrollbar{
+    display: none
+}
+.main_app_index .el-card__header{
+    font-size: 0.95vw;
+}
+.main_app_index .index_card .el-collapse{
+    overflow-y: scroll;
+}
+.main_app_index .index_card .el-collapse::-webkit-scrollbar{
+    display: none
+}
+.main_app_index .index_card .inner_top{
+    font-size: 0.85vw
+}
+.main_app_index .index_card .inner_body{
+    padding-left: 1vw;
+}
+.main_app_index .index_card .server_disk_list{
+    display: flex;
+    height: 1.25vw;
+    align-items: center;
+    margin:0.2vw 0;
+}
+.main_app_index .index_card .server_disk_bar{
+    display: flex;
+    flex:1;
+    justify-content: center;
+    border:solid 1px #7BA23F;
+    box-sizing: border-box;
+    margin:0 0.25vw;
+    border-radius: 0.625vw;
+    text-shadow: 0 0 2px #fff;
+}
+.main_app_index .index_card .server_disk_occupy{
+    display: flex;
+    width: 3.55vw;
+}
+.el-collapse-item:last-child {
+    margin-bottom: 0px;/*覆盖*/
+}
+.main_app_index .main_app_container{
+    display: flex
+}
+.main_app_index .index_setting .index_setting_select{
+    margin-top: 1vw;
+}
+.main_app_index .index_setting .index_setting_select .el-select{
+    width: 100%
 }

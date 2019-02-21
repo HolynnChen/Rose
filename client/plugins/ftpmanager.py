@@ -3,7 +3,7 @@ import aiohttp
 import psutil
 import async_timeout
 #import configloader as co
-#import gb
+from threading import Thread
 co={
     'ws_address':'http://127.0.0.1:8123/ftpmanager/ws_keep',
     'ws_confirm':'http://127.0.0.1:8123/ftpmanager/ws_confirm'}
@@ -11,6 +11,7 @@ import uuid,hashlib
 NAME=hashlib.md5(uuid.UUID(int = uuid.getnode()).hex[-12:].encode()).hexdigest()
 APP_KEY='1234567890'
 Encrypt=hashlib.sha256((NAME+APP_KEY).encode()).hexdigest()
+var={}
 def expect(data,target):return all([i in data for i in target])
 class ftpmanager:
     __ws_tool=None
@@ -25,35 +26,34 @@ class ftpmanager:
             return
         ws = await connect_session.ws_connect(co['ws_address'],heartbeat=30, receive_timeout=60,headers={'cookie':str(resp.cookies).split(':')[1]})
         self.__ws_tool=ws_tool(ws)
-        #try:
-        print({'uuid':uuid.uuid1().hex,'data':{'msg':'hello'}})
-        await ws.send_json({'msg':'hello'})
-        async for msg in ws:
-            if msg.type == aiohttp.WSMsgType.CLOSED:
-                await ws.close()
-                break
-            elif msg.type == aiohttp.WSMsgType.ERROR:
-                break
-            try:
-                resp=msg.json()
-                if not expect(resp,['data','uuid']):
-                    print('服务端发来不支持的信息',resp)
+        try:
+            await ws.send_json({'target':'update_info','parameters':{'server_id':NAME,'disk_info':ftpmanager_tools.get_disk_info()},'uuid':uuid.uuid1().hex})
+            async for msg in ws:
+                if msg.type == aiohttp.WSMsgType.CLOSED:
+                    await ws.close()
+                    break
+                elif msg.type == aiohttp.WSMsgType.ERROR:
+                    break
+                try:
+                    resp=msg.json()
+                    if not expect(resp,['data','uuid']):
+                        print('服务端发来不支持的信息',resp)
+                        continue
+                    todo=resp['data']
+                    if not expect(todo,['type','cmd']):
+                        print('服务端发来不支持的指令',resp)
+                        continue
+                    if todo['type']=='ftpmanager_tools':
+                        if hasattr(ftpmanager_tools,todo['cmd']) and callable(getattr(ftpmanager_tools,todo['cmd'])):
+                            await self.__ws_tool.respon(resp['uuid'],getattr(ftpmanager_tools,todo['cmd'])(**(todo.get('data',{}))))
+                except:
                     continue
-                todo=resp['data']
-                if not expect(todo,['type','cmd']):
-                    print('服务端发来不支持的指令',resp)
-                    continue
-                if todo['type']=='ftpmanager_tools':
-                    if hasattr(ftpmanager_tools,todo['cmd']) and callable(getattr(ftpmanager_tools,todo['cmd'])):
-                        await self.__ws_tool.respon(resp['uuid'],getattr(ftpmanager_tools,todo['cmd'])(**(todo.get('data',{}))))
-            except:
-                continue
-        #except asyncio.CancelledError:
-        #    print('服务器已离线')
-        #    return ws
-        #except:
-        #    print('服务器意外离线')
-        #    return ws
+        except asyncio.CancelledError:
+           print('服务器已离线')
+           return ws
+        except:
+           print('服务器意外离线')
+           return ws
         return
 
 class ws_tool:
@@ -82,6 +82,29 @@ class ftpmanager_tools:
     @staticmethod
     def get_disk_info():
         return {i:psutil.disk_usage(i) for i in [j.device for j in psutil.disk_partitions()]}
+
+async def Timer():
+    loop=asyncio.get_event_loop()
+    while True:
+        try:
+            async with async_timeout.timeout(1):
+                func,time = await var['Timer'].get()
+                loop.call_later(time,Timer_add,func,time)
+                if asyncio.iscoroutinefunction(func):
+                    loop.call_later(time,asyncio.ensure_future,func)
+                else:
+                    loop.call_later(time,func)
+        except (asyncio.TimeoutError, asyncio.CancelledError):
+            continue
+
+def Timer_add(func,time):var['Timer'].put_nowait((func,time))
+def keep_Timer():
+    loop = asyncio.new_event_loop()
+    var['Timer'] = asyncio.Queue(loop=loop)
+    loop.run_until_complete(Timer())
+
+Thread(target=keep_Timer).start()
 temp=ftpmanager()
 loop=asyncio.get_event_loop()
 loop.run_until_complete(temp.connect())
+#gb.var['await'].append(temp.connect())

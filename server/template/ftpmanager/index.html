@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html>
+
 <head>
     <link rel="stylesheet" type="text/css" href="/static/ftpmanager/css/normalize.css">
     <link href="https://cdn.bootcss.com/element-ui/2.5.4/theme-chalk/index.css" rel="stylesheet">
@@ -10,6 +11,7 @@
     <meta charset="UTF-8">
     <title>Ftpmanager管理页面</title>
 </head>
+
 <body>
     <div class="main" id="main_app">
         <div class="main_header">
@@ -32,43 +34,193 @@
             <div class="main_body_content">
                 <div class="main_app_index">
                     <div class="index_top_bar">
-                        <p>服务器状态总览</p>
+                        <p>服务器状态总览({{app.connect?'自动同步中':'连接已断开'}})</p>
                     </div>
-                    <div class="index_status">
-                        <el-card class="index_card">
-                            <div slot="header">
-                                <span>接入服务器数量</span>
-                            </div>
-                            <div>
-                                <p>在线：{{app.index.online_server}}台</p>
-                                <p>离线：{{app.index.all_server-app.index.online_server}}台</p>
-                            </div>
-                        </el-card>
+                    <div class="main_app_container">
+                        <div class="index_status">
+                            <el-card class="index_card">
+                                <div slot="header">
+                                    <i class="el-icon-tickets"></i>
+                                    <span>接入服务器数量</span>
+                                </div>
+                                <div>
+                                    <p>在线：{{server_status_filter(1).length}}台</p>
+                                    <p>离线：{{server_status_filter(0).length}}台</p>
+                                    <p>异常：{{server_status_filter(2).length}}台</p>
+                                </div>
+                            </el-card>
+                            <el-card class="index_card">
+                                <div slot="header">所有服务器列表</div>
+                                <div>
+                                    <el-collapse>
+                                        <el-collapse-item v-for="server in app.index.servers" :title="server.name">
+                                            <div class="server_status">
+                                                <p class="inner_top">服务器状态</p>
+                                                <p class="inner_body">{{['离线','在线','异常'][server.status]}}</p>
+                                            </div>
+                                            <div class="server_disk">
+                                                <p class="inner_top">磁盘占用情况</p>
+                                                <div class="server_disk_list"
+                                                    v-for="(disk,name) in server.more.disk_info">
+                                                    <div class="server_disk_bar"
+                                                        :style="{background: 'linear-gradient(to right,#7BA23F 0%,#7BA23F '+disk[3]+'%,#ffffff '+disk[3]+'%,#ffffff 100%)'}"
+                                                        :title="toGB(disk[1])+'GB/'+toGB(disk[0])+'GB'">目录:{{name}}
+                                                    </div>
+                                                    <div class="server_disk_occupy">占用:{{disk[3]}}%</div>
+                                                </div>
+                                            </div>
+                                        </el-collapse-item>
+                                    </el-collapse>
+                                </div>
+                            </el-card>
+                        </div>
+                        <div class="index_setting">
+                            <el-card class="index_card">
+                                <div slot="header">
+                                    <i class="el-icon-setting"></i>
+                                    <span>服务器信息配置</span>
+                                    <div class="index_setting_select">
+                                        <el-select v-model="app.index.changeinfo.server_id" placeholder="请选择">
+                                            <el-option-group v-for="(servers,index) in sorted_service" :key="index"
+                                                :label="['在线','离线','异常'][index]">
+                                                <el-option v-for="server in servers" :label="server.name"
+                                                    :value="server.server_id"></el-option>
+                                            </el-option-group>
+                                        </el-select>
+                                    </div>
+                                </div>
+                                <div v-if="app.index.changeinfo.server_id">
+                                    <div class="index_form">
+                                        <el-form :inline="true">
+                                            <el-form-item>
+                                                <el-input v-model="app.index.changeinfo.data"
+                                                    placeholder="修改名字，3-15字之间"></el-input>
+                                            </el-form-item>
+                                            <el-form-item>
+                                                <el-button type="primary" round
+                                                    @click="app.index.changeinfo.flag && changename()">确认</el-button>
+                                            </el-form-item>
+                                        </el-form>
+                                        <div class="index_button">
+                                            <el-button
+                                                :disable="app.index.servers_dict[app.index.changeinfo.server_id].status==1"
+                                                type="danger" round @click="delete_server">删除服务器</el-button>
+                                            <el-button type="info" round @click="clear_index">取消所有操作</el-button>
+                                        </div>
+                                    </div>
+                                </div>
+                            </el-card>
+                        </div>
                     </div>
                 </div>
             </div>
         </div>
     </div>
     <script>
-        var app=new Vue({
-            el:'#main_app',
-            data:{
-                menu:{
-                    isCollapse:true,
+        var app = new Vue({
+            el: '#main_app',
+            data: {
+                menu: {
+                    isCollapse: true,
                 },
-                app:{
-                    index:{
-                        online_server:0,
-                        all_server:0
+                app: {
+                    connect:true,
+                    index: {
+                        servers: [],
+                        servers_dict: {},
+                        changeinfo: { server_id: null, target: null, data: null, flag: true }
                     }
                 }
             },
             methods: {
-                menu_toggle:function(){
-                    this.menu.isCollapse=!this.menu.isCollapse
+                menu_toggle: function () {
+                    this.menu.isCollapse = !this.menu.isCollapse
+                },
+                dic_length: dic => Object.keys(dic).length,
+                server_status_filter: function (status) {
+                    return this.app.index.servers.filter(x => x.status == status)
+                },
+                toGB: zijie => (zijie / 1073741824).toFixed(2),
+                changename: function () {
+                    self = this;
+                    self.app.index.changeinfo.flag = false;
+                    fetch_post('/ftpmanager/api/change_server_info', {
+                        'server_id': self.app.index.changeinfo.server_id,
+                        'target': 'name',
+                        'data': self.app.index.changeinfo.data
+                    }).then(res => {
+                        self.app.index.changeinfo.flag = true;
+                        if (!res.code == 0) {
+                            self.$alert(res.err_msg, '异常操作', {
+                                confirmButtonText: '确定',
+                                type: 'error'
+                            })
+                        } else {
+                            self.$message.success("修改成功");
+                            self.app.index.changeinfo = { server_id: null, target: null, data: null, flag: true }
+                        }
+                    })
+                },
+                clear_index: function () {
+                    this.app.index.changeinfo = { server_id: null, target: null, data: null, flag: true }
+                },
+                delete_server: function () {
+                    self = this
+                    self.app.index.changeinfo.flag = false;
+                    self.$confirm('此操作将会永久删除该服务器以及相关的用户记录，确认继续？', '警告', {
+                        confirmButtonText: '确定',
+                        cancelButtonText: '取消',
+                        type: 'warning'
+                    }).then(() => {
+                        fetch_post('/ftpmanager/api/del_server', { 'server_id': this.app.index.changeinfo.server_id }).then(res => {
+                            self.app.index.changeinfo.flag = true;
+                            if (!res.code == 0) {
+                                self.$alert(res.err_msg, '异常操作', {
+                                    confirmButtonText: '确定',
+                                    type: 'error'
+                                })
+                            } else {
+                                self.$message.success("修改成功");
+                                self.app.index.changeinfo = { server_id: null, target: null, data: null, flag: true };
+                                window.location.href = window.location.href
+                            }
+                        })
+                    })
                 }
+            },
+            computed: {
+                sorted_service: function () {
+                    let result = [];
+                    for (let i of [1, 0, 2]) result.push(this.server_status_filter(i));
+                    console.log(result);
+                    return result
+                }
+            },
+            created: function () {
+                self = this;
+                fetch_get('/ftpmanager/api/async_info').then(res => {
+                    for (let i in res) self.app.index.servers.push(res[i]);
+                    self.app.index.servers_dict = res;
+                })
+                let just=setInterval(() => {
+                    fetch_get('/ftpmanager/api/async_info').then(res => {
+                        let=result=[];
+                        for (let i in res) result.push(res[i]);
+                        self.app.index.servers=result;
+                        self.app.index.servers_dict = res;
+                    }).catch(_=>{
+                        clearInterval(just);
+                        self.app.connect=false;
+                        self.$notify.error({
+                            title:'发生了什么情况！',
+                            message:'与服务器的连接断开了，是网络问题吗？要重新刷新试下吗？',
+                            duration:0,
+                        })
+                        })
+                }, 2000)
             },
         })
     </script>
 </body>
+
 </html>
