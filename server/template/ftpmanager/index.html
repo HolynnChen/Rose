@@ -23,7 +23,7 @@
                         <i class="el-icon-menu"></i>
                         <span slot="title">主菜单</span>
                     </el-menu-item>
-                    <el-menu-item index="999" @click="menu_toggle">
+                    <el-menu-item index="9" @click="menu_toggle">
                         <i :class="{'el-icon-caret-bottom':menu.isCollapse,'el-icon-caret-top':!menu.isCollapse}"></i>
                         <span slot="title">{{menu.isCollapse?"展开":"收起"}}</span>
                     </el-menu-item>
@@ -31,7 +31,20 @@
             </div>
             <div class="main_body_content">
                 <div class="main_app_index">
-                    
+                    <div class="index_top_bar">
+                        <p>服务器状态总览</p>
+                    </div>
+                    <div class="index_status">
+                        <el-card class="index_card">
+                            <div slot="header">
+                                <span>接入服务器数量</span>
+                            </div>
+                            <div>
+                                <p>在线：{{app.index.online_server}}台</p>
+                                <p>离线：{{app.index.all_server-app.index.online_server}}台</p>
+                            </div>
+                        </el-card>
+                    </div>
                 </div>
             </div>
         </div>
@@ -42,6 +55,12 @@
             data:{
                 menu:{
                     isCollapse:true,
+                },
+                app:{
+                    index:{
+                        online_server:0,
+                        all_server:0
+                    }
                 }
             },
             methods: {

@@ -70,6 +70,7 @@ body{
     width: 100vw;
     display: flex;
     flex-direction: column;
+    background-image: url('../img/texture.png')
 }
 .main_header{
     height: 4vw;
@@ -97,11 +98,23 @@ body{
     display: flex;
 }
 .main_menu{
-    max-width: 8vw;
+    width: 8vw;
     height: 100%;
     /*transition: all 0.5s!important*/
+}
+.el-menu--collapse{
+    width: 64px;
 }
 .main_body_content{
     height: 100%;
     width: 100%
+}
+.main_app_index .index_top_bar p{
+    margin-left: 2vw;
+    color:#fff;
+    font-size: 1.2vw;
+}
+.main_app_index .index_card{
+    width: 15vw;
+    margin: 2vw;
 }
