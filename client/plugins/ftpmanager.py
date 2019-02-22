@@ -1,4 +1,4 @@
-import asyncio
+import asyncio,sys
 import aiohttp
 import psutil
 import async_timeout
@@ -8,9 +8,9 @@ co={
     'ws_address':'http://127.0.0.1:8123/ftpmanager/ws_keep',
     'ws_confirm':'http://127.0.0.1:8123/ftpmanager/ws_confirm'}
 import uuid,hashlib
-NAME=hashlib.md5(uuid.UUID(int = uuid.getnode()).hex[-12:].encode()).hexdigest()
+SRC=hashlib.md5(uuid.UUID(int = uuid.getnode()).hex[-12:].encode()).hexdigest()
 APP_KEY='1234567890'
-Encrypt=hashlib.sha256((NAME+APP_KEY).encode()).hexdigest()
+NAME=hashlib.sha256((SRC+APP_KEY).encode()).hexdigest()
 var={}
 def expect(data,target):return all([i in data for i in target])
 class ftpmanager:
@@ -19,7 +19,7 @@ class ftpmanager:
         return
     async def connect(self):
         connect_session = aiohttp.ClientSession()
-        resp=await connect_session.post(co['ws_confirm'],data={'server_id':NAME,'verify':Encrypt})
+        resp=await connect_session.post(co['ws_confirm'],data={'server_id':NAME,'verify':SRC})
         result=await resp.json()
         if not result['code']==0:
             print('APP_KEY错误')
@@ -30,9 +30,11 @@ class ftpmanager:
             await ws.send_json({'target':'update_info','parameters':{'server_id':NAME,'disk_info':ftpmanager_tools.get_disk_info()},'uuid':uuid.uuid1().hex})
             async for msg in ws:
                 if msg.type == aiohttp.WSMsgType.CLOSED:
+                    print('收到关闭信息')
                     await ws.close()
                     break
                 elif msg.type == aiohttp.WSMsgType.ERROR:
+                    print('收到异常信息')
                     break
                 try:
                     resp=msg.json()
@@ -105,6 +107,10 @@ def keep_Timer():
 
 Thread(target=keep_Timer).start()
 temp=ftpmanager()
-loop=asyncio.get_event_loop()
+loop=None
+if sys.platform=="win32":
+    loop=asyncio.ProactorEventLoop()
+    asyncio.set_event_loop(loop)
+else:
+    loop=asyncio.get_event_loop()
 loop.run_until_complete(temp.connect())
-#gb.var['await'].append(temp.connect())

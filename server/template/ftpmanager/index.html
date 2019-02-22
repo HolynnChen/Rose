@@ -5,6 +5,7 @@
     <link rel="stylesheet" type="text/css" href="/static/ftpmanager/css/normalize.css">
     <link href="https://cdn.bootcss.com/element-ui/2.5.4/theme-chalk/index.css" rel="stylesheet">
     <link rel="stylesheet" type="text/css" href="/static/ftpmanager/css/main.css">
+    <link rel="stylesheet" type="text/css" href="//at.alicdn.com/t/font_1055306_fir40j9usx7.css">
     <script src="https://cdn.bootcss.com/vue/2.6.4/vue.min.js"></script>
     <script src="https://cdn.bootcss.com/element-ui/2.5.4/index.js"></script>
     <script type="text/javascript" src="/static/ftpmanager/js/main.js"></script>
@@ -20,10 +21,14 @@
         </div>
         <div class="main_body">
             <div class="main_body_menu">
-                <el-menu class="main_menu" :collapse="menu.isCollapse">
+                <el-menu class="main_menu" :collapse="menu.isCollapse" default-active="1" @select="change_page">
                     <el-menu-item index="1">
                         <i class="el-icon-menu"></i>
                         <span slot="title">主菜单</span>
+                    </el-menu-item>
+                    <el-menu-item index="2">
+                        <i class="el-icon- iconfont icon-user"></i>
+                        <span slot="title">用户管理</span>
                     </el-menu-item>
                     <el-menu-item index="9" @click="menu_toggle">
                         <i :class="{'el-icon-caret-bottom':menu.isCollapse,'el-icon-caret-top':!menu.isCollapse}"></i>
@@ -32,7 +37,7 @@
                 </el-menu>
             </div>
             <div class="main_body_content">
-                <div class="main_app_index">
+                <div class="main_app_index" v-if="app.page==1">
                     <div class="index_top_bar">
                         <p>服务器状态总览({{app.connect?'自动同步中':'连接已断开'}})</p>
                     </div>
@@ -53,7 +58,7 @@
                                 <div slot="header">所有服务器列表</div>
                                 <div>
                                     <el-collapse>
-                                        <el-collapse-item v-for="server in server_by_status" :title="server.name">
+                                        <el-collapse-item v-for="server in server_by_status" :title="server.name.slice(0,35)+(server.name.length>35?'...':'')">
                                             <div class="server_status">
                                                 <p class="inner_top">服务器状态</p>
                                                 <p class="inner_body">{{['离线','在线','异常'][server.status]}}</p>
@@ -113,6 +118,14 @@
                         </div>
                     </div>
                 </div>
+                <div class="main_app_user" v-if="app.page==2">
+                    <div class="user_top_bar">
+                        <p>服务器用户总览({{app.connect?'自动同步中':'连接已断开'}})</p>
+                    </div>
+                    <div class="main_app_contain">
+                        
+                    </div>
+                </div>
             </div>
         </div>
     </div>
@@ -125,6 +138,7 @@
                 },
                 app: {
                     connect:true,
+                    page:1,
                     index: {
                         servers: [],
                         servers_dict: {},
@@ -133,6 +147,9 @@
                 }
             },
             methods: {
+                change_page:function(key,keypath){
+                    if(key<9)this.app.page=key;
+                },
                 menu_toggle: function () {
                     this.menu.isCollapse = !this.menu.isCollapse
                 },

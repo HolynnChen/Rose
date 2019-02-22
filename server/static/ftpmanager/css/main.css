@@ -177,3 +177,13 @@ body{
 .main_app_index .index_setting .index_setting_select .el-select{
     width: 100%
 }
+
+
+.main_app_user .user_top_bar p {
+    margin-left: 2vw;
+    color: #fff;
+    font-size: 1.2vw;
+}
+.main_app_user .main_app_container{
+    display: flex
+}

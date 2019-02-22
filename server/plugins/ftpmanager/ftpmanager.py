@@ -62,11 +62,11 @@ class ftpmanager:
         self._helper=sqlite_helper()
         self._wst=ws_tool()
         self.__tools=ftp_tools(self,self._helper)
+        gb.var['app.on_shutdown'].append(self._wst.close())
         print('FtpManager模块已启用')
         self._server_table=self._helper.get_server_list() or {}
         for i in self._server_table:
-            self._server_table[i]['more']=pickle.loads(self._server_table[i]['more'])
-
+            self._server_table[i]['more']=self._server_table[i]['more']
 
     async def default_get(self,request):
         return await self.index_get(request)
@@ -128,11 +128,16 @@ class ftpmanager:
             del self.super._server_table[data['server_id']]
             self.super._helper.delete('server',{'server_id':data['server_id']})
             return web.json_response({'code':0,'msg':'success'})
+        
+        @manager_required
+        async def get_base_user_info(self,request):
+            
+            pass
     
     async def ws_confirm_post(self,request):
         data = await request.post()
         if not expect(data,['server_id','verify']):return web.json_response({'code':-1,'err_msg':'参数不完整'})
-        if hashlib.sha256((data['server_id']+APP_KEY).encode()).hexdigest()==data['verify']:
+        if hashlib.sha256((data['verify']+APP_KEY).encode()).hexdigest()==data['server_id']:
             session=await get_session(request)
             session['ftpmanager_verify']=True
             session['server_id']=data['server_id']
@@ -149,7 +154,6 @@ class ftpmanager:
         self._wst.add(server_id,ws)
         self._helper.active_server(server_id)
         self._server_table[server_id]=self._helper.search('server',{'server_id':server_id})
-        self._server_table[server_id]['more']=pickle.loads(self._server_table[server_id]['more'])
         try:
             print('online',server_id)
             async for msg in ws:
@@ -167,7 +171,8 @@ class ftpmanager:
             self._helper.change_server_status(server_id,0)
             print('offline', server_id)
             return ws
-        except:
+        except Exception as e:
+            print(e)
             self._server_table[server_id]['status']=2
             self._helper.change_server_status(server_id,2)
             print('error', server_id)
@@ -182,13 +187,13 @@ class sqlite_helper:
 
     def __new_init__(self):
         print('FtpManager:正在初始化')
-        self._db=sqlite3.connect(self._directory+'\\ftpmanager.db',check_same_thread=False)
+        self._db=sqlite3.connect(self._directory+'\\ftpmanager.db',check_same_thread=False,detect_types=sqlite3.PARSE_DECLTYPES)
         cursor=self._db.cursor()
         sql_init=[
-            'create table users (id integer primary key autoincrement not null, name text not null, password text not null, mail text not null, db_note text)',
+            'create table users (id integer primary key autoincrement not null, name text not null, user_id text not null,password text not null, mail text not null, db_note text)',
             'create table manager (id integer primary key autoincrement not null, name text not null, password text not null, mail text not null, permissions text)',
-            'create table server (id integer primary key autoincrement not null, name text not null, server_id text not null, status int not null, more blob)',
-            'create table db_note (id integer primary key autoincrement not null, name text not null, server_id text not null, more text)'
+            'create table server (id integer primary key autoincrement not null, name text not null, server_id text not null, status int not null, more dict)',
+            'create table db_note (id integer primary key autoincrement not null, name text not null, server_id text not null, more dict)'
         ]
         for i in sql_init:cursor.execute(i)
         self._db.commit()
@@ -198,11 +203,13 @@ class sqlite_helper:
 
     def __init__(self):
         import os
+        sqlite3.register_adapter(dict,pickle.dumps)
+        sqlite3.register_converter('dict',pickle.loads)
         self._directory,_=os.path.split(os.path.realpath(__file__))
         if not os.path.isfile(self._directory+'\\ftpmanager.db'):
             print('FtpManager:数据库文件不存在，尝试创建并初始化')
             self.__new_init__()
-        self._db = sqlite3.connect(self._directory + '\\ftpmanager.db',check_same_thread=False)
+        self._db = sqlite3.connect(self._directory + '\\ftpmanager.db',check_same_thread=False,detect_types=sqlite3.PARSE_DECLTYPES)
         cursor=self._db.cursor()
         cursor.execute('update server set status=0')#设置所有服务器状态为离线
         self._db.commit()
@@ -213,13 +220,13 @@ class sqlite_helper:
         cursor.execute(sql,(name,password,mail,permissions))
         self._db.commit()
 
-    def _add_user(self,name,password,mail,db_note):
+    def _add_user(self,name,password,mail,db_note,server_id):
         cursor = self._db.cursor()
-        sql = 'insert into users (name, password, mail, db_note) values (?,?,?,?)'
-        cursor.execute(sql, (name, password, mail, db_note))
+        sql = f'insert into users{"" if not server_id else "_"+server_id } (name, user_id, password, mail, db_note) values (?,?,?,?,?)'
+        cursor.execute(sql, (name, uuid.uuid4().hex, password, mail, db_note))
         self._db.commit()
 
-    def _add_server(self,name,ip,status=0,more=pickle.dumps({})):
+    def _add_server(self,name,ip,status=0,more={}):
         cursor = self._db.cursor()
         sql = 'insert into servers (name, ip, status, more) values (?,?,?,?)'
         cursor.execute(sql, (name, ip,status,more))
@@ -287,7 +294,10 @@ class sqlite_helper:
     
     def active_server(self,server_id):
         if not self.search('server',{'server_id':server_id}):
-            self.insert('server',{'server_id':server_id,'status':1,'name':server_id,'more':pickle.dumps({})})
+            self.insert('server',{'server_id':server_id,'status':1,'name':server_id,'more':{}})
+            cursor=self._db.cursor()
+            cursor.execute(f'create table users_{server_id} (id integer primary key autoincrement not null, name text not null, user_id text not null, password text not null, mail text not null, db_note text)')
+            self._db.commit()
             return
         self.change_server_status(server_id,1)
     def change_server_status(self,server_id,status):self.update('server',{'status':status},{'server_id':server_id})
@@ -315,7 +325,11 @@ class ws_tool:
     async def send_all(self,json):
         if not len(self.wss):return []
         return await sorted_wait([self.send(i,json) for i in self.wss])
-
+    
+    async def close(self):
+        todo=[i.close() for i in self.wss.values()]
+        if not len(todo):return
+        await asyncio.wait(todo)
 class ftp_tools:
     def __init__(self,master,helper):
         self._master=master
@@ -323,6 +337,6 @@ class ftp_tools:
     def update_info(self,params):
         if expect(params,['server_id','disk_info']) and params['server_id'] in self._master._server_table:
             self._master._server_table[params['server_id']]['more']['disk_info']=params['disk_info']
-            more=pickle.loads(self._helper.search('server',{'server_id':params['server_id']})['more'])
+            more=self._helper.search('server',{'server_id':params['server_id']})['more']
             more['disk_info']=params['disk_info']
-            self._helper.update('server',{'more':pickle.dumps(more)},{'server_id':params['server_id']})
+            self._helper.update('server',{'more':more},{'server_id':params['server_id']})

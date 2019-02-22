@@ -22,6 +22,8 @@ def init():
     var['templateFuncClassDic']={}
     var['init']=[]
     var['application']={}
+    var['app.on_startup']=[]
+    var['app.on_shutdown']=[]
     #__add_class_func_to_local__(var["global_route"], ['addClass', 'add_rewrite_rule','route_rewrite','addRoute'])
 
 def update(key,value):

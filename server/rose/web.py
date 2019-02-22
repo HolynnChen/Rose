@@ -1,5 +1,5 @@
 import asyncio
-import os
+import os,sys
 import base64
 import hashlib
 from aiohttp_session import setup
@@ -71,27 +71,49 @@ def keep_Timer():
     gb.var['Timer'] = asyncio.Queue(loop=loop)
     gb.Timer_add(gc.collect,600)
     loop.run_until_complete(gb.Timer())
+def do_app_task(task_list):
+    t1=[]
+    for i in range(len(task_list)-1,-1,-1):
+        if asyncio.iscoroutine(task_list[i]):
+            t1.append(task_list.pop(i))
+        elif asyncio.iscoroutinefunction(task_list[i]):
+            t1.append(task_list.pop(i)())
+    if len(t1):
+        asyncio.get_event_loop().run_until_complete(asyncio.wait(t1))
+    while len(task_list):
+        task_list.pop()()
+        
+
 def server_start(devmode=False):
+    loop=None
+    if sys.platform=="win32":
+        loop=asyncio.ProactorEventLoop()
+        asyncio.set_event_loop(loop)
+    else:
+        loop=asyncio.get_event_loop()
     Thread(target=keep_worker).start()
     Thread(target=keep_Timer).start()
     load_plugin()
-    loop = asyncio.get_event_loop()
+
     while True:
         app=init()
         if 'app' in gb.var:del gb.var['app']
         gb.var['app']=app
         gb.var['app_loop'] = loop
+        #grace_full startup and shutdown
+        do_app_task(gb.var['app.on_startup'])
         if devmode:
             import aiohttp_debugtoolbar
             aiohttp_debugtoolbar.setup(app)
         runner=aiohttp.web.AppRunner(app)
         loop.run_until_complete(runner.setup())
-        site = aiohttp.web.TCPSite(runner, 'localhost', co.config['port'] if 'port' in co.config else 8080)
+        site = aiohttp.web.TCPSite(runner, '0.0.0.0', co.config['port'] if 'port' in co.config else 8080)
         try:
             loop.run_until_complete(site.start())
             print(f'======== Running on {site._host}:{site._port} ========')
             loop.run_forever()
             print('应用已关闭，准备重启')
+            do_app_task(gb.var['app.on_shutdown'])
             loop.run_until_complete(site.stop())
             loop.run_until_complete(runner.cleanup())
             del app,site,runner
@@ -99,6 +121,7 @@ def server_start(devmode=False):
         except Exception as e:
             print(str(e))
             print('未知错误')
+            do_app_task(gb.var['app.on_shutdown'])
             loop.run_until_complete(site.stop())
             loop.run_until_complete(runner.cleanup())
             del app,site,runner
