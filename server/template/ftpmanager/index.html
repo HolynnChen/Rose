@@ -53,7 +53,7 @@
                                 <div slot="header">所有服务器列表</div>
                                 <div>
                                     <el-collapse>
-                                        <el-collapse-item v-for="server in app.index.servers" :title="server.name">
+                                        <el-collapse-item v-for="server in server_by_status" :title="server.name">
                                             <div class="server_status">
                                                 <p class="inner_top">服务器状态</p>
                                                 <p class="inner_body">{{['离线','在线','异常'][server.status]}}</p>
@@ -192,7 +192,14 @@
                 sorted_service: function () {
                     let result = [];
                     for (let i of [1, 0, 2]) result.push(this.server_status_filter(i));
-                    console.log(result);
+                    return result
+                },
+                server_by_status:function(){
+                    let result=[];
+                    for(let i of [1,0,2]){
+                        let temp=this.server_status_filter(i);
+                        for(let j in temp)result.push(temp[j]);
+                    }
                     return result
                 }
             },

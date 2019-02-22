@@ -325,4 +325,4 @@ class ftp_tools:
             self._master._server_table[params['server_id']]['more']['disk_info']=params['disk_info']
             more=pickle.loads(self._helper.search('server',{'server_id':params['server_id']})['more'])
             more['disk_info']=params['disk_info']
-            self._helper.update('server',{'more':pickle.dumps(more)})
+            self._helper.update('server',{'more':pickle.dumps(more)},{'server_id':params['server_id']})
