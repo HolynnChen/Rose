@@ -123,7 +123,18 @@
                         <p>服务器用户总览({{app.connect?'自动同步中':'连接已断开'}})</p>
                     </div>
                     <div class="main_app_contain">
-                        
+                        <div class="user_status">
+                            <el-card class="user_card">
+                                <div slot="header">用户数量统计</div>
+                                <div>
+                                    <p>用户总数：{{app.user.users.all}}</p>
+                                    <div v-for="(num,server) in app.user.users.servers" class="all_count">
+                                        <p>服务器名：{{app.index.servers_dict[server].name}}</p>
+                                        <p>开通人数：{{num}}</p>
+                                    </div>
+                                </div>
+                            </el-card>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -143,6 +154,12 @@
                         servers: [],
                         servers_dict: {},
                         changeinfo: { server_id: null, target: null, data: null, flag: true }
+                    },
+                    user:{
+                        users:{
+                            all:0,
+                            servers:[],
+                        }
                     }
                 }
             },
@@ -223,17 +240,22 @@
             created: function () {
                 self = this;
                 fetch_get('/ftpmanager/api/async_info').then(res => {
-                    for (let i in res) self.app.index.servers.push(res[i]);
+                    let result=[];
+                    for (let i in res) result.push(res[i]);
+                    self.app.index.servers=result;
                     self.app.index.servers_dict = res;
                 })
-                let just=setInterval(() => {
+                fetch_get('/ftpmanager/api/get_base_user_info').then(res=>{
+                    self.app.user.users=res;
+                })
+                let just1=setInterval(() => {
                     fetch_get('/ftpmanager/api/async_info').then(res => {
-                        let=result=[];
+                        let result=[];
                         for (let i in res) result.push(res[i]);
                         self.app.index.servers=result;
                         self.app.index.servers_dict = res;
                     }).catch(_=>{
-                        clearInterval(just);
+                        clearInterval(just1);
                         self.app.connect=false;
                         self.$notify.error({
                             title:'发生了什么情况！',

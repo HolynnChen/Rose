@@ -187,3 +187,21 @@ body{
 .main_app_user .main_app_container{
     display: flex
 }
+
+.main_app_user .user_card{
+    width: 18vw;
+    margin: 2vw;
+    overflow-y: scroll;
+}
+.main_app_user .user_card::-webkit-scrollbar{
+    display: none
+}
+.main_app_user .all_count{
+    box-shadow: 0 0 4px 1px #2EA9DF;
+    padding: 0.1vw 0.5vw;
+    box-sizing: border-box;
+    border-radius: 0.5vw;
+}
+.main_app_user .all_count p{
+    margin:0.2vw 0;
+}

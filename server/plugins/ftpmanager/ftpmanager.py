@@ -130,9 +130,9 @@ class ftpmanager:
             return web.json_response({'code':0,'msg':'success'})
         
         @manager_required
-        async def get_base_user_info(self,request):
-            
-            pass
+        async def get_base_user_info_get(self,request):
+            keys=list(self.super._server_table.keys())
+            return web.json_response({'all':self.super._helper.search('users',column_filter='count() as number')['number'],'servers':{i:self.super._helper.search('users_'+i,column_filter='count() as number')['number'] for i in keys}})
     
     async def ws_confirm_post(self,request):
         data = await request.post()
