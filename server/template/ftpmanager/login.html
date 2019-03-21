@@ -14,8 +14,8 @@
             <p>Hope FTP在线管理系统</p>
         </div>
         <div class="login" id="login">
-            <input id="user" v-model.trim="user" type="text" placeholder="请输入您的用户名或注册邮箱">
-            <input id="password" v-model.trim="password" type="password" placeholder="请输入您的密码">
+            <input id="user" v-model.trim="user" type="text" placeholder="请输入您的用户名或注册邮箱" @keyup.enter="loginflag && login()">
+            <input id="password" v-model.trim="password" type="password" placeholder="请输入您的密码" @keyup.enter="loginflag && login()">
             <div class="login_confirm" @click="loginflag && login()">
                 <button>登录</button>
             </div>

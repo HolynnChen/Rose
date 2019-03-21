@@ -201,6 +201,7 @@ body{
     padding: 0.1vw 0.5vw;
     box-sizing: border-box;
     border-radius: 0.5vw;
+    margin: 0.6vw 0;
 }
 .main_app_user .all_count p{
     margin:0.2vw 0;

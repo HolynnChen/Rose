@@ -297,6 +297,7 @@ class sqlite_helper:
             self.insert('server',{'server_id':server_id,'status':1,'name':server_id,'more':{}})
             cursor=self._db.cursor()
             cursor.execute(f'create table users_{server_id} (id integer primary key autoincrement not null, name text not null, user_id text not null, password text not null, mail text not null, db_note text)')
+            cursor.execute(f'create table logs_{server_id} (id integer primary key autoincrement not null,sql text not null, data dict)')
             self._db.commit()
             return
         self.change_server_status(server_id,1)
