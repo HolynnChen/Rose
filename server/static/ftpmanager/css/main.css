@@ -206,3 +206,6 @@ body{
 .main_app_user .all_count p{
     margin:0.2vw 0;
 }
+.main_app_user .main_app_container{
+    display: flex
+}

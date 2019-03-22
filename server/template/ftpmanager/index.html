@@ -122,7 +122,7 @@
                     <div class="user_top_bar">
                         <p>服务器用户总览({{app.connect?'自动同步中':'连接已断开'}})</p>
                     </div>
-                    <div class="main_app_contain">
+                    <div class="main_app_container">
                         <div class="user_status">
                             <el-card class="user_card">
                                 <div slot="header">用户数量统计</div>
@@ -134,6 +134,17 @@
                                     </div>
                                 </div>
                             </el-card>
+                        </div>
+                        <div class="user_manage">
+                            <p>用户管理</p>
+                            <div class="user_manage_query">
+                                <el-cascader :options="app.index.servers" :props="app.user.search_props"></el-cascader>
+                                <el-input v-model="app.user.search_user.user_keyword">
+                                </el-input>
+                            </div>
+                        </div>
+                        <div class="dbnote_manage">
+                            <p>标签管理</p>
                         </div>
                     </div>
                 </div>
@@ -159,6 +170,16 @@
                         users:{
                             all:0,
                             servers:[],
+                        },
+                        search_user:{
+                            server_id:null,
+                            dbnote_id:null,
+                            user_keyword:null,
+                        },
+                        search_props:{
+                            value:"server_id",
+                            label:"name",
+                            children:''
                         }
                     }
                 }

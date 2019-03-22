@@ -193,7 +193,8 @@ class sqlite_helper:
             'create table users (id integer primary key autoincrement not null, name text not null, user_id text not null,password text not null, mail text not null, db_note text)',
             'create table manager (id integer primary key autoincrement not null, name text not null, password text not null, mail text not null, permissions text)',
             'create table server (id integer primary key autoincrement not null, name text not null, server_id text not null, status int not null, more dict)',
-            'create table db_note (id integer primary key autoincrement not null, name text not null, server_id text not null, more dict)'
+            'create table db_note (id integer primary key autoincrement not null, name text not null, server_id text not null, more dict)',
+            'create table relation (id integer primary key autoincrement not null, user integer not null, db_note integer not null)'
         ]
         for i in sql_init:cursor.execute(i)
         self._db.commit()
@@ -296,7 +297,6 @@ class sqlite_helper:
         if not self.search('server',{'server_id':server_id}):
             self.insert('server',{'server_id':server_id,'status':1,'name':server_id,'more':{}})
             cursor=self._db.cursor()
-            cursor.execute(f'create table users_{server_id} (id integer primary key autoincrement not null, name text not null, user_id text not null, password text not null, mail text not null, db_note text)')
             cursor.execute(f'create table logs_{server_id} (id integer primary key autoincrement not null,sql text not null, data dict)')
             self._db.commit()
             return
