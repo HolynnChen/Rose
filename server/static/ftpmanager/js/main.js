@@ -19,3 +19,22 @@ function fetch_post(url,json){
         body:toParams(json)
     }).then(response=>response.json())
 }
+function isListObjectValueEqual(a, b,within) {
+    if(a.length!=b.length)return false
+    for(let i of within){
+        for(let j=0;j<a.length;j++){
+            if(!a[j].hasOwnProperty(i)||!b[j].hasOwnProperty(i)||a[j][i]!=b[j][i])return false;
+        }
+    }
+    return true
+}
+function checkObjectWithProp(a,name,value){
+    if(a.hasOwnProperty(name) && a[name]==value)return true;
+    return false
+}
+function findObjectInList(a,name,value){
+    for(let i of a){
+        if(checkObjectWithProp(i,name,value))return i
+    }
+    return null
+}

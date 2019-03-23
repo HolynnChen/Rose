@@ -139,7 +139,7 @@ class ftpmanager:
             data=await request.post()
             if not expect(data,['server_id']):return web.json_response({'code':-1,'err_msg':'参数不完整'})
             if not data['server_id'] in self.super._server_table:return web.json_response({'code':-1,'err_msg':'参数错误'})
-            return web.json_response({'code':0,'data':self.super._helper.search('db_note',filter_dict={'server_id':data['server_id']})})
+            return web.json_response({'code':0,'data':self.super._helper.search('db_note',fetchlimit=-1,filter_dict={'server_id':data['server_id']})})
     
     async def ws_confirm_post(self,request):
         data = await request.post()

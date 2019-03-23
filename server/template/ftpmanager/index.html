@@ -138,7 +138,7 @@
                         <div class="user_manage">
                             <p>用户管理</p>
                             <div class="user_manage_query">
-                                <el-cascader :options="app.index.servers" :props="app.user.search_props"></el-cascader>
+                                <el-cascader :options="app.user.servers" :props="app.user.search_props" @active-item-change="load_dbnote"></el-cascader>
                                 <el-input v-model="app.user.search_user.user_keyword">
                                 </el-input>
                             </div>
@@ -181,7 +181,8 @@
                             label:"name",
                             children:'',
                             temp:null
-                        }
+                        },
+                        servers:[]
                     }
                 }
             },
@@ -244,7 +245,25 @@
                     })
                 },
                 load_dbnote:function(server_id){
-
+                    self=this
+                    server_id=server_id[0]
+                    if(findObjectInList(self.app.user.servers,'server_id',server_id).children.length==0){
+                        fetch_post('/ftpmanager/api/get_server_notes',{'server_id':server_id}).then(res=>{
+                            if (!res.code == 0) {
+                                self.$alert(res.err_msg, '异常操作', {
+                                    confirmButtonText: '确定',
+                                    type: 'error'
+                                })
+                            } else {
+                                for(let i=0;i<self.app.user.servers.length;i++){
+                                    if(self.app.user.servers[i].server_id==server_id){
+                                        self.app.user.servers[i].children=res.data || [];
+                                        break;
+                                    }
+                                }
+                            }
+                        })
+                    }
                 }
             },
             computed: {
@@ -269,6 +288,15 @@
                     for (let i in res) result.push(res[i]);
                     self.app.index.servers=result;
                     self.app.index.servers_dict = res;
+                    let temp=[]
+                    for(let i in res){
+                        temp_one={}
+                        temp_one['server_id']=i
+                        temp_one['name']=res[i]['name']
+                        temp_one['children']=[]
+                        temp.push(temp_one)
+                    }
+                    self.app.user.servers=temp;
                 })
                 fetch_get('/ftpmanager/api/get_base_user_info').then(res=>{
                     self.app.user.users=res;
@@ -279,6 +307,15 @@
                         for (let i in res) result.push(res[i]);
                         self.app.index.servers=result;
                         self.app.index.servers_dict = res;
+                        let temp=[]
+                        for(let i in res){
+                            temp_one={}
+                            temp_one['server_id']=i
+                            temp_one['name']=res[i]['name']
+                            temp_one['children']=[]
+                            temp.push(temp_one)
+                        }
+                        if(!isListObjectValueEqual(self.app.user.servers,temp,['server_id','name']))self.app.user.servers=temp
                     }).catch(_=>{
                         clearInterval(just1);
                         self.app.connect=false;
