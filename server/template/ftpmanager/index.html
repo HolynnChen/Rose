@@ -37,7 +37,7 @@
                 </el-menu>
             </div>
             <div class="main_body_content">
-                <div class="main_app_index" v-if="app.page==1">
+                <div class="main_app_index" v-show="app.page==1">
                     <div class="index_top_bar">
                         <p>服务器状态总览({{app.connect?'自动同步中':'连接已断开'}})</p>
                     </div>
@@ -118,7 +118,7 @@
                         </div>
                     </div>
                 </div>
-                <div class="main_app_user" v-if="app.page==2">
+                <div class="main_app_user" v-show="app.page==2">
                     <div class="user_top_bar">
                         <p>服务器用户总览({{app.connect?'自动同步中':'连接已断开'}})</p>
                     </div>
@@ -138,9 +138,15 @@
                         <div class="user_manage">
                             <p>用户管理</p>
                             <div class="user_manage_query">
-                                <el-cascader :options="app.user.servers" :props="app.user.search_props" @active-item-change="load_dbnote"></el-cascader>
-                                <el-input v-model="app.user.search_user.user_keyword">
-                                </el-input>
+                                <div class="user_manage_query_search">
+                                    <el-cascader class="search_a" :options="app.user.servers" :props="app.user.search_props" @change="load_dbnote" change-on-select clearable></el-cascader>
+                                    <el-input class="search_b" placeholder="可输入用户名关键字" v-model="app.user.search_user.user_keyword" @input.native="get_user" @clear="get_user" clearable>
+                                    </el-input>
+                                </div>
+                                <el-table :data="app.user.tempdata">
+                                    <el-table-column prop="user_id" label="ID"></el-table-column>
+                                    <el-table-column prop="name" label="姓名"></el-table-column>
+                                </el-table>
                             </div>
                         </div>
                         <div class="dbnote_manage">
@@ -173,7 +179,7 @@
                         },
                         search_user:{
                             server_id:null,
-                            dbnote_id:null,
+                            db_note:null,
                             user_keyword:null,
                         },
                         search_props:{
@@ -182,7 +188,8 @@
                             children:'',
                             temp:null
                         },
-                        servers:[]
+                        servers:[],
+                        tempdata:[]
                     }
                 }
             },
@@ -199,7 +206,7 @@
                 },
                 toGB: zijie => (zijie / 1073741824).toFixed(2),
                 changename: function () {
-                    self = this;
+                    let self = this;
                     self.app.index.changeinfo.flag = false;
                     fetch_post('/ftpmanager/api/change_server_info', {
                         'server_id': self.app.index.changeinfo.server_id,
@@ -222,7 +229,7 @@
                     this.app.index.changeinfo = { server_id: null, target: null, data: null, flag: true }
                 },
                 delete_server: function () {
-                    self = this
+                    let self = this
                     self.app.index.changeinfo.flag = false;
                     self.$confirm('此操作将会永久删除该服务器以及相关的用户记录，确认继续？', '警告', {
                         confirmButtonText: '确定',
@@ -245,7 +252,18 @@
                     })
                 },
                 load_dbnote:function(server_id){
-                    self=this
+                    let self=this
+                    self.app.user.search_user.server_id=null
+                    self.app.user.search_user.db_note=null
+                    self.app.user.search_user.user_keyword=null
+                    self.app.user.tempdata=[]
+                    if(server_id.length==0)return;
+                    self.app.user.search_user.server_id=server_id[0]
+                    if(server_id.length>1){
+                        self.app.user.search_user.db_note=server_id[1]
+                    }
+                    self.get_user()
+                    if(server_id.length>1)return;
                     server_id=server_id[0]
                     if(findObjectInList(self.app.user.servers,'server_id',server_id).children.length==0){
                         fetch_post('/ftpmanager/api/get_server_notes',{'server_id':server_id}).then(res=>{
@@ -255,15 +273,30 @@
                                     type: 'error'
                                 })
                             } else {
+                                let tempdata=res.data.map(item=>{let tempitem={};tempitem['name']=item['name'],tempitem['server_id']=item['id'];return tempitem})
                                 for(let i=0;i<self.app.user.servers.length;i++){
                                     if(self.app.user.servers[i].server_id==server_id){
-                                        self.app.user.servers[i].children=res.data || [];
+                                        self.app.user.servers[i].children=tempdata || [];
                                         break;
                                     }
                                 }
                             }
                         })
                     }
+                },
+                get_user:function(){
+                    let self=this
+                    self.app.user.tempdata=[]
+                    fetch_post('/ftpmanager/api/get_users',self.app.user.search_user).then(res=>{
+                        if (!res.code == 0) {
+                            self.$alert(res.err_msg, '异常操作', {
+                                confirmButtonText: '确定',
+                                type: 'error'
+                            })
+                        } else {
+                            self.app.user.tempdata=res.data
+                        }
+                    })
                 }
             },
             computed: {
@@ -317,6 +350,7 @@
                         }
                         if(!isListObjectValueEqual(self.app.user.servers,temp,['server_id','name']))self.app.user.servers=temp
                     }).catch(_=>{
+                        console.log(_)
                         clearInterval(just1);
                         self.app.connect=false;
                         self.$notify.error({

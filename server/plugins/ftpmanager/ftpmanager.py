@@ -139,7 +139,24 @@ class ftpmanager:
             data=await request.post()
             if not expect(data,['server_id']):return web.json_response({'code':-1,'err_msg':'参数不完整'})
             if not data['server_id'] in self.super._server_table:return web.json_response({'code':-1,'err_msg':'参数错误'})
-            return web.json_response({'code':0,'data':self.super._helper.search('db_note',fetchlimit=-1,filter_dict={'server_id':data['server_id']})})
+            return web.json_response({'code':0,'data':self.super._helper.search('db_note',fetchlimit=-1,filter_dict={'server_id':data['server_id']}) or []})
+
+        @manager_required
+        async def get_users_post(self,request):
+            data=await request.post()
+            if not expect(data,['server_id','db_note','user_keyword']):return web.json_response({'code':-1,'err_msg':'参数不完整'})
+            #if not data['server_id'] in self.super._server_table:return web.json_response({'code':-1,'err_msg':'参数错误'})
+            sql="select users.user_id,users.name from (users inner join relation on users.user_id=relation.user) inner join db_note on relation.db_note=db_note.id"
+            want_filt=[]
+            if data['server_id']:
+                want_filt.append("db_note.server_id=:server_id")
+            if data['db_note']:
+                want_filt.append("relation.db_note=:db_note")
+            if data['user_keyword']:
+                want_filt.append("instr(users.name,:user_keyword)>0")
+            if len(want_filt):sql+=' where '+' and '.join(want_filt)
+            filter_dict={i:data[i] for i in ['server_id','db_note','user_keyword']}
+            return web.json_response({'code':0,'data':self.super._helper.search('relation',fetchlimit=-1,special_sql=sql,filter_dict=filter_dict) or []})
     
     async def ws_confirm_post(self,request):
         data = await request.post()

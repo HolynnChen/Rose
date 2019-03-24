@@ -2,7 +2,8 @@ function toParams(param) {
     var result = ""
     for (let name in param) {
         if (typeof param[name] != 'function') {
-            result += "&" + name + "=" + encodeURI(param[name]);
+            if(param[name])result += "&" + name + "=" + encodeURI(param[name]);
+            else result+="&"+name+"="
         }
     }
     return result.substring(1)

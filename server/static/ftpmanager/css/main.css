@@ -209,3 +209,14 @@ body{
 .main_app_user .main_app_container{
     display: flex
 }
+.main_app_user .user_manage_query_search{
+    display: flex
+}
+.main_app_user .user_manage_query_search .search_a{
+    display: flex;
+    flex:4
+}
+.main_app_user .user_manage_query_search .search_b{
+    display: flex;
+    flex:3
+}
