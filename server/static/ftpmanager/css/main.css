@@ -220,3 +220,19 @@ body{
     display: flex;
     flex:3
 }
+
+/*vue?????*/
+.user_change-leave-active{
+    transition: all 0.5s;
+    opacity: 1;
+}
+.user_change-leave-to{
+    opacity: 0;
+}
+.user_change-enter-active{
+    transition: all 0.5s;
+    opacity: 0;
+}
+.user_change-enter-to{
+    opacity: 1;
+}

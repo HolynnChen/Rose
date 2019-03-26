@@ -137,17 +137,22 @@
                         </div>
                         <div class="user_manage">
                             <p>用户管理</p>
-                            <div class="user_manage_query">
-                                <div class="user_manage_query_search">
-                                    <el-cascader class="search_a" :options="app.user.servers" :props="app.user.search_props" @change="load_dbnote" change-on-select clearable></el-cascader>
-                                    <el-input class="search_b" placeholder="可输入用户名关键字" v-model="app.user.search_user.user_keyword" @input.native="get_user" @clear="get_user" clearable>
-                                    </el-input>
+                            <transition name="user_change" mode="out-in">
+                                <div class="user_manage_query" v-if="!app.user.select_user" key="top">
+                                    <div class="user_manage_query_search">
+                                        <el-cascader class="search_a" :options="app.user.servers" :props="app.user.search_props" @change="load_dbnote" change-on-select clearable></el-cascader>
+                                        <el-input class="search_b" placeholder="可输入用户名关键字" v-model="app.user.search_user.user_keyword" @input.native="get_user" @clear="get_user" clearable>
+                                        </el-input>
+                                    </div>
+                                    <el-table :data="app.user.tempdata">
+                                        <el-table-column prop="user_id" label="ID"></el-table-column>
+                                        <el-table-column prop="name" label="姓名"></el-table-column>
+                                    </el-table>
                                 </div>
-                                <el-table :data="app.user.tempdata">
-                                    <el-table-column prop="user_id" label="ID"></el-table-column>
-                                    <el-table-column prop="name" label="姓名"></el-table-column>
-                                </el-table>
-                            </div>
+                                <div class="user_selected_manage" v-else key="button">
+                                    <p>用户管理区</p>
+                                </div>
+                            </transition>
                         </div>
                         <div class="dbnote_manage">
                             <p>标签管理</p>
@@ -189,7 +194,8 @@
                             temp:null
                         },
                         servers:[],
-                        tempdata:[]
+                        tempdata:[],
+                        select_user:null
                     }
                 }
             },
