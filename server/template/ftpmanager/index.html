@@ -145,7 +145,7 @@
                                             <el-input class="search_b" placeholder="用户名或邮箱" v-model="app.user.search_user.user_keyword" @input.native="get_users" @clear="get_users" clearable>
                                             </el-input>
                                         </div>
-                                        <el-table :data="app.user.userlist" highlight-current-row @current-change="get_user" v-loading="app.user.loading">
+                                        <el-table :data="app.user.userlist" highlight-current-row @current-change="get_user" v-loading="app.user.loading.user_loading">
                                             <el-table-column prop="user_id" label="ID" min-width="20%"></el-table-column>
                                             <el-table-column prop="name" label="姓名" min-width="30%"></el-table-column>
                                             <el-table-column prop="mail" label="邮箱" min-width="50%"></el-table-column>
@@ -165,8 +165,12 @@
                                             <el-form-item label="当前标签">
                                                 <br>
                                                 <el-tag v-for="tag in app.user.select_user.user_dbnote" closable size="small" :key="tag" @close="user_update().remove_tag(tag)">{{tag.name}}</el-tag>
-                                                <el-button size="mini" round >增加标签</el-button>
+                                                <el-button size="mini" round @click="app.user.tag_dialog.see=true">增加标签</el-button>
                                             </el-form-item>
+                                            <el-dialog title="选择标签" :visible.sync="app.user.tag_dialog.see" width="fit-content">
+                                                <el-cascader v-model="app.user.tag_dialog.value" :options="app.user.servers" :props="app.user.search_props" @active-item-change="load_dbnote" clearable></el-cascader>
+                                                <el-button round type="success" @click="user_update().add_tag()">确认添加</el-button>
+                                            </el-dialog>
                                         </el-form>
                                         <div class="button_container">
                                             <el-button size="small" round type="success" @click="user_update().change()">确认修改</el-button>
@@ -221,7 +225,13 @@
                         userlist:[],
                         select_user:null,
                         select_user_bak:null,
-                        loading:0
+                        loading:{
+                            user_loading:0
+                        },
+                        tag_dialog:{
+                            see:false,
+                            value:null
+                        }
                     }
                 }
             },
@@ -305,7 +315,7 @@
                                     type: 'error'
                                 })
                             } else {
-                                let userlist=res.data.map(item=>{let tempitem={};tempitem['name']=item['name'],tempitem['server_id']=item['id'];return tempitem})
+                                let userlist=res.data.map(item=>{let tempitem={};tempitem['name']=item['name'],tempitem['server_id']=item['id'],tempitem['more']=item['more'];return tempitem})
                                 for(let i=0;i<self.app.user.servers.length;i++){
                                     if(self.app.user.servers[i].server_id==server_id){
                                         self.app.user.servers[i].children=userlist || [];
@@ -319,7 +329,7 @@
                 get_users:function(){
                     let self=this
                     //self.app.user.userlist=[]
-                    self.app.user.loading++
+                    self.app.user.loading.user_loading++
                     fetch_post('/ftpmanager/api/get_users',self.app.user.search_user).then(res=>{
                         if (!res.code == 0) {
                             self.$alert(res.err_msg, '异常操作', {
@@ -330,12 +340,12 @@
                             self.app.user.userlist=res.data
                         }
                     }).finally(
-                        ()=>self.app.user.loading--
+                        ()=>self.app.user.loading.user_loading--
                     )
                 },
                 get_user:function(row){
                     let self=this
-                    self.app.user.loading++
+                    self.app.user.loading.user_loading++
                     fetch_post('/ftpmanager/api/get_user',{'user_id':row.user_id}).then(res=>{
                         if (!res.code == 0) {
                             self.$alert(res.err_msg, '异常操作', {
@@ -347,7 +357,7 @@
                             self.app.user.select_user_bak=deepCopy(res.data)
                         }
                     }).finally(
-                        ()=>self.app.user.loading--
+                        ()=>self.app.user.loading.user_loading--
                     )
                 },
                 user_update:function(){
@@ -390,6 +400,23 @@
                         remove_tag:(tag)=>{
                             let self=this
                             self.app.user.select_user.user_dbnote.splice(self.app.user.select_user.user_dbnote.indexOf(tag),1)
+                        },
+                        add_tag:()=>{
+                            let self=this
+                            let server_id=self.app.user.tag_dialog.value[0],dbnote_id=self.app.user.tag_dialog.value[1]
+                            for(let i of self.app.user.servers){
+                                if(i.server_id==server_id){
+                                    for(let j of i.children){
+                                        if(j.server_id=dbnote_id){
+                                            self.app.user.select_user.user_dbnote.push({id:dbnote_id,name:j.name,server_id:server_id,more:j.more});
+                                            break
+                                        }
+                                    }
+                                }
+                            }
+                            self.app.user.tag_dialog.see=false
+                            self.app.user.tag_dialog.value=[]
+                            //sel.app.user.select_user.user_dbnote.push()
                         }
                     }
                 }
