@@ -136,23 +136,47 @@
                             </el-card>
                         </div>
                         <div class="user_manage">
-                            <p>用户管理</p>
-                            <transition name="user_change" mode="out-in">
-                                <div class="user_manage_query" v-if="!app.user.select_user" key="top">
-                                    <div class="user_manage_query_search">
-                                        <el-cascader class="search_a" :options="app.user.servers" :props="app.user.search_props" @change="load_dbnote" change-on-select clearable></el-cascader>
-                                        <el-input class="search_b" placeholder="可输入用户名关键字" v-model="app.user.search_user.user_keyword" @input.native="get_user" @clear="get_user" clearable>
-                                        </el-input>
+                            <el-card class="user_card">
+                                <div slot="header">用户管理</div>
+                                <transition name="user_change" mode="out-in">
+                                    <div class="user_manage_query" v-if="!app.user.select_user" key="top">
+                                        <div class="user_manage_query_search">
+                                            <el-cascader class="search_a" :options="app.user.servers" :props="app.user.search_props" @change="load_dbnote" change-on-select clearable></el-cascader>
+                                            <el-input class="search_b" placeholder="用户名或邮箱" v-model="app.user.search_user.user_keyword" @input.native="get_users" @clear="get_users" clearable>
+                                            </el-input>
+                                        </div>
+                                        <el-table :data="app.user.userlist" highlight-current-row @current-change="get_user" v-loading="app.user.loading">
+                                            <el-table-column prop="user_id" label="ID" min-width="20%"></el-table-column>
+                                            <el-table-column prop="name" label="姓名" min-width="30%"></el-table-column>
+                                            <el-table-column prop="mail" label="邮箱" min-width="50%"></el-table-column>
+                                        </el-table>
                                     </div>
-                                    <el-table :data="app.user.tempdata">
-                                        <el-table-column prop="user_id" label="ID"></el-table-column>
-                                        <el-table-column prop="name" label="姓名"></el-table-column>
-                                    </el-table>
-                                </div>
-                                <div class="user_selected_manage" v-else key="button">
-                                    <p>用户管理区</p>
-                                </div>
-                            </transition>
+                                    <div class="user_selected_manage" v-else key="button">
+                                        <el-form v-model="app.user.select_user">
+                                            <el-form-item label="用户名">
+                                                <el-input v-model="app.user.select_user.user_info.name"></el-input>
+                                            </el-form-item>
+                                            <el-form-item label="用户邮箱">
+                                                <el-input v-model="app.user.select_user.user_info.mail"></el-input>
+                                            </el-form-item>
+                                            <el-form-item label="重置密码">
+                                                <el-input v-model="app.user.select_user.user_info.password" placeholder="请输入密码，留空不修改" show-password></el-input>
+                                            </el-form-item>
+                                            <el-form-item label="当前标签">
+                                                <br>
+                                                <el-tag v-for="tag in app.user.select_user.user_dbnote" closable size="small" :key="tag" @close="user_update().remove_tag(tag)">{{tag.name}}</el-tag>
+                                                <el-button size="mini" round >增加标签</el-button>
+                                            </el-form-item>
+                                        </el-form>
+                                        <div class="button_container">
+                                            <el-button size="small" round type="success" @click="user_update().change()">确认修改</el-button>
+                                            <el-button size="small" round type="danger" @click="user_update().remove()">删除用户</el-button>
+                                            <el-button size="small" round type="warning" @click="user_update().default()">重置</el-button>
+                                            <el-button size="small" round type="primary" @click="user_update().back()">取消</el-button>
+                                        </div>
+                                    </div>
+                                </transition>
+                            </el-card>
                         </div>
                         <div class="dbnote_manage">
                             <p>标签管理</p>
@@ -194,8 +218,10 @@
                             temp:null
                         },
                         servers:[],
-                        tempdata:[],
-                        select_user:null
+                        userlist:[],
+                        select_user:null,
+                        select_user_bak:null,
+                        loading:0
                     }
                 }
             },
@@ -262,13 +288,13 @@
                     self.app.user.search_user.server_id=null
                     self.app.user.search_user.db_note=null
                     self.app.user.search_user.user_keyword=null
-                    self.app.user.tempdata=[]
+                    self.app.user.userlist=[]
                     if(server_id.length==0)return;
                     self.app.user.search_user.server_id=server_id[0]
                     if(server_id.length>1){
                         self.app.user.search_user.db_note=server_id[1]
                     }
-                    self.get_user()
+                    self.get_users()
                     if(server_id.length>1)return;
                     server_id=server_id[0]
                     if(findObjectInList(self.app.user.servers,'server_id',server_id).children.length==0){
@@ -279,10 +305,10 @@
                                     type: 'error'
                                 })
                             } else {
-                                let tempdata=res.data.map(item=>{let tempitem={};tempitem['name']=item['name'],tempitem['server_id']=item['id'];return tempitem})
+                                let userlist=res.data.map(item=>{let tempitem={};tempitem['name']=item['name'],tempitem['server_id']=item['id'];return tempitem})
                                 for(let i=0;i<self.app.user.servers.length;i++){
                                     if(self.app.user.servers[i].server_id==server_id){
-                                        self.app.user.servers[i].children=tempdata || [];
+                                        self.app.user.servers[i].children=userlist || [];
                                         break;
                                     }
                                 }
@@ -290,9 +316,10 @@
                         })
                     }
                 },
-                get_user:function(){
+                get_users:function(){
                     let self=this
-                    self.app.user.tempdata=[]
+                    //self.app.user.userlist=[]
+                    self.app.user.loading++
                     fetch_post('/ftpmanager/api/get_users',self.app.user.search_user).then(res=>{
                         if (!res.code == 0) {
                             self.$alert(res.err_msg, '异常操作', {
@@ -300,9 +327,71 @@
                                 type: 'error'
                             })
                         } else {
-                            self.app.user.tempdata=res.data
+                            self.app.user.userlist=res.data
                         }
-                    })
+                    }).finally(
+                        ()=>self.app.user.loading--
+                    )
+                },
+                get_user:function(row){
+                    let self=this
+                    self.app.user.loading++
+                    fetch_post('/ftpmanager/api/get_user',{'user_id':row.user_id}).then(res=>{
+                        if (!res.code == 0) {
+                            self.$alert(res.err_msg, '异常操作', {
+                                confirmButtonText: '确定',
+                                type: 'error'
+                            })
+                        } else {
+                            self.app.user.select_user=deepCopy(res.data)
+                            self.app.user.select_user_bak=deepCopy(res.data)
+                        }
+                    }).finally(
+                        ()=>self.app.user.loading--
+                    )
+                },
+                user_update:function(){
+                    return {
+                        change:()=>{
+                            let self=this
+                            let addTags=[]
+                            let removeTags=[]
+                            let a=self.app.user.select_user.user_dbnote.map(e=>e.id)
+                            let b=self.app.user.select_user_bak.user_dbnote.map(e=>e.id)
+                            for(let i of a)if(b.indexOf(i)==-1)addTags.push(i)
+                            for(let i of b)if(a.indexOf(i)==-1)removeTags.push(i)
+                            let change_pack={'user_id':self.app.user.select_user.user_info.user_id,'user_info':hasChanged(self.app.user.select_user_bak.user_info,self.app.user.select_user.user_info),'user_dbnote':{'addTags':addTags,'removeTags':removeTags}}
+                            console.log(change_pack)
+                            fetch_json('/ftpmanager/api/user_change',change_pack).then(res=>{
+                                if (!res.code == 0) {
+                                    self.$alert(res.err_msg, '异常操作', {
+                                        confirmButtonText: '确定',
+                                        type: 'error'
+                                    })
+                                } else {
+                                    self.$message.success("修改成功");
+                                    self.app.user.search_user.server_id=null
+                                    self.app.user.search_user.db_note=null
+                                    self.app.user.search_user.user_keyword=null
+                                    self.app.user.userlist=[]
+                                    self.user_update().back();
+                                }
+                            })
+
+                        },
+                        remove:()=>{},
+                        default:()=>{
+                            this.app.user.select_user=this.app.user.select_user_bak
+                        },
+                        back:()=>{
+                            this.app.user.select_user_bak=null
+                            this.app.user.select_user=null
+                        },
+                        remove_tag:(tag)=>{
+                            let self=this
+                            self.app.user.select_user.user_dbnote.splice(self.app.user.select_user.user_dbnote.indexOf(tag),1)
+                        }
+                    }
                 }
             },
             computed: {
@@ -348,11 +437,7 @@
                         self.app.index.servers_dict = res;
                         let temp=[]
                         for(let i in res){
-                            temp_one={}
-                            temp_one['server_id']=i
-                            temp_one['name']=res[i]['name']
-                            temp_one['children']=[]
-                            temp.push(temp_one)
+                            temp.push({'server_id':i,'name':res[i]['name'],'children':[]})
                         }
                         if(!isListObjectValueEqual(self.app.user.servers,temp,['server_id','name']))self.app.user.servers=temp
                     }).catch(_=>{
@@ -365,7 +450,7 @@
                             duration:0,
                         })
                         })
-                }, 2000)
+                }, 10000)
             },
         })
     </script>

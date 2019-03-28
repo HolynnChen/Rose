@@ -220,6 +220,12 @@ body{
     display: flex;
     flex:3
 }
+.main_app_user .button_container .el-button+.el-button{
+    margin-left: 5px;
+}
+.main_app_user .user_selected_manage .el-tag + .el-tag{
+    margin-left: 5px;
+}
 
 /*vue?????*/
 .user_change-leave-active{

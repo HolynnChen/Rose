@@ -146,14 +146,14 @@ class ftpmanager:
             data=await request.post()
             if not expect(data,['server_id','db_note','user_keyword']):return web.json_response({'code':-1,'err_msg':'参数不完整'})
             #if not data['server_id'] in self.super._server_table:return web.json_response({'code':-1,'err_msg':'参数错误'})
-            sql="select distinct users.user_id,users.name from (users inner join relation on users.user_id=relation.user) inner join db_note on relation.db_note=db_note.id"
+            sql="select distinct users.user_id,users.name,users.mail from (users inner join relation on users.user_id=relation.user) inner join db_note on relation.db_note=db_note.id"
             want_filt=[]
             if data['server_id']:
                 want_filt.append("db_note.server_id=:server_id")
             if data['db_note']:
                 want_filt.append("relation.db_note=:db_note")
             if data['user_keyword']:
-                want_filt.append("instr(users.name,:user_keyword)>0")
+                want_filt.append("instr(users.name,:user_keyword)>0 or instr(users.mail,:user_keyword)>0")
             if len(want_filt):sql+=' where '+' and '.join(want_filt)
             filter_dict={i:data[i] for i in ['server_id','db_note','user_keyword']}
             return web.json_response({'code':0,'data':self.super._helper.search('relation',fetchlimit=-1,special_sql=sql,filter_dict=filter_dict) or []})
@@ -162,8 +162,29 @@ class ftpmanager:
         async def get_user_post(self,request):
             data=await request.post()
             if not expect(data,['user_id']):return web.json_response({'code':-1,'err_msg':'参数不完整'})
-            result=self.super._helper.search('users',filter_dict={'user_id':data['user_id']})
-            return web.json_response({'code':0,'data':result})
+            user_info=self.super._helper.search('users',filter_dict={'user_id':data['user_id']},column_filter="name,user_id,mail")
+            sql="select db_note.* from relation inner join db_note on relation.db_note=db_note.id where relation.user=:user_id"
+            user_dbnote=self.super._helper.search('db_note',fetchlimit=-1,special_sql=sql,filter_dict={'user_id':data['user_id']})
+            return web.json_response({'code':0,'data':{"user_info":user_info,"user_dbnote":user_dbnote}})
+
+        @manager_required
+        async def user_change_post(self,request):
+            data=await request.json()
+            if not expect(data,['user_id','user_info','user_dbnote']) or not expect(data['user_dbnote'],['addTags','removeTags']):return web.json_response({'code':-1,'err_msg':'参数不完整'})
+            user_info={i:data['user_info'][i] for i in data['user_info'] if i in ['name','password','mail']}
+            if len(user_info)>0:
+                self.super._helper.update('users',user_info,filter_dict={'user_id':data['user_id']})
+            change_dbnote=data['user_dbnote']
+            if len(change_dbnote['removeTags'])>0:
+                sql="delete from relation where user=:user_id and db_note in (:"+",".join(map(str,range(len(change_dbnote['removeTags']))))+")"
+                filter_dict={str(i):change_dbnote['removeTags'][i] for i in range(len(change_dbnote['removeTags']))}
+                filter_dict['user_id']=data['user_id']
+                self.super._helper.delete('relation',special_sql=sql,filter_dict=filter_dict)
+            if len(change_dbnote['addTags'])>0:
+                sql="insert into relation (user,db_note) values (:user_id,:db_note)"
+                dicts=[{'user_id':data['user_id'],"db_note":i} for i in change_dbnote['addTags']]
+                self.super._helper.insert('relation',special_sql=sql,dicts=dicts)
+            return web.json_response({'code':0,'msg':'success'})
     
     async def ws_confirm_post(self,request):
         data = await request.post()
