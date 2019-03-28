@@ -183,7 +183,10 @@ class ftpmanager:
             if len(change_dbnote['addTags'])>0:
                 sql="insert into relation (user,db_note) values (:user_id,:db_note)"
                 dicts=[{'user_id':data['user_id'],"db_note":i} for i in change_dbnote['addTags']]
-                self.super._helper.insert('relation',special_sql=sql,dicts=dicts)
+                try:
+                    self.super._helper.insert('relation',special_sql=sql,dicts=dicts)
+                except:
+                    return web.json_response({'code':-1,'err_msg':'写入异常，即将刷新'})
             return web.json_response({'code':0,'msg':'success'})
     
     async def ws_confirm_post(self,request):
@@ -246,7 +249,8 @@ class sqlite_helper:
             'create table manager (id integer primary key autoincrement not null, name text not null, password text not null, mail text not null, permissions text)',
             'create table server (id integer primary key autoincrement not null, name text not null, server_id text not null, status int not null, more dict)',
             'create table db_note (id integer primary key autoincrement not null, name text not null, server_id text not null, more dict)',
-            'create table relation (id integer primary key autoincrement not null, user integer not null, db_note integer not null)'
+            'create table relation (id integer primary key autoincrement not null, user integer not null, db_note integer not null)',
+            'create unique index only on relation (user,db_note)'
         ]
         for i in sql_init:cursor.execute(i)
         self._db.commit()

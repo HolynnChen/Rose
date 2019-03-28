@@ -314,6 +314,7 @@
                                     confirmButtonText: '确定',
                                     type: 'error'
                                 })
+                                setTimeout(()=>window.location.href = window.location.href,3000)
                             } else {
                                 let userlist=res.data.map(item=>{let tempitem={};tempitem['name']=item['name'],tempitem['server_id']=item['id'],tempitem['more']=item['more'];return tempitem})
                                 for(let i=0;i<self.app.user.servers.length;i++){
@@ -371,13 +372,13 @@
                             for(let i of a)if(b.indexOf(i)==-1)addTags.push(i)
                             for(let i of b)if(a.indexOf(i)==-1)removeTags.push(i)
                             let change_pack={'user_id':self.app.user.select_user.user_info.user_id,'user_info':hasChanged(self.app.user.select_user_bak.user_info,self.app.user.select_user.user_info),'user_dbnote':{'addTags':addTags,'removeTags':removeTags}}
-                            console.log(change_pack)
                             fetch_json('/ftpmanager/api/user_change',change_pack).then(res=>{
                                 if (!res.code == 0) {
                                     self.$alert(res.err_msg, '异常操作', {
                                         confirmButtonText: '确定',
                                         type: 'error'
                                     })
+                                    setTimeout(()=>window.location.href = window.location.href,3000)
                                 } else {
                                     self.$message.success("修改成功");
                                     self.app.user.search_user.server_id=null
