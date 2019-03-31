@@ -188,6 +188,27 @@ class ftpmanager:
                 except:
                     return web.json_response({'code':-1,'err_msg':'写入异常，即将刷新'})
             return web.json_response({'code':0,'msg':'success'})
+        
+        @manager_required
+        async def get_dbnote_post(self,request):
+            data=await request.post()
+            if not expect(data,['server_id','dbnote_keyword']):return web.json_response({'code':-1,'err_msg':'参数不完整'})
+            sql="select * from db_note"
+            want_filt=[]
+            if data['server_id']:
+                want_filt.append("server_id=:server_id")
+            if data['dbnote_keyword']:
+                want_filt.append("instr(name,:dbnote_keyword)>0")
+            if len(want_filt)>0:
+                sql+=' where '+' and '.join(want_filt)
+            filter_dict={i:data[i] for i in ['server_id','dbnote_keyword']}
+            return web.json_response({'code':0,'data':self.super._helper.search('db_note',special_sql=sql,fetchlimit=-1,filter_dict=filter_dict)})
+
+        @manager_required
+        async def dbnote_change_post(self,request):
+            data=await request.json()
+            return web.json_response({'code':0,'msg':'success'})
+
     
     async def ws_confirm_post(self,request):
         data = await request.post()

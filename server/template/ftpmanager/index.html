@@ -165,10 +165,10 @@
                                             <el-form-item label="当前标签">
                                                 <br>
                                                 <el-tag v-for="tag in app.user.select_user.user_dbnote" closable size="small" :key="tag" @close="user_update().remove_tag(tag)">{{tag.name}}</el-tag>
-                                                <el-button size="mini" round @click="app.user.tag_dialog.see=true">增加标签</el-button>
+                                                <el-button size="mini" round @click="app.user.user_tag_dialog.see=true">增加标签</el-button>
                                             </el-form-item>
-                                            <el-dialog title="选择标签" :visible.sync="app.user.tag_dialog.see" width="fit-content">
-                                                <el-cascader v-model="app.user.tag_dialog.value" :options="app.user.servers" :props="app.user.search_props" @active-item-change="load_dbnote" clearable></el-cascader>
+                                            <el-dialog title="选择标签" :visible.sync="app.user.user_tag_dialog.see" width="fit-content">
+                                                <el-cascader v-model="app.user.user_tag_dialog.value" :options="app.user.servers" :props="app.user.search_props" @active-item-change="load_dbnote" clearable></el-cascader>
                                                 <el-button round type="success" @click="user_update().add_tag()">确认添加</el-button>
                                             </el-dialog>
                                         </el-form>
@@ -183,7 +183,25 @@
                             </el-card>
                         </div>
                         <div class="dbnote_manage">
-                            <p>标签管理</p>
+                            <el-card  class="user_card">
+                                <div slot="header">标签管理</div>
+                                <div>
+                                    <div class="user_manage_query_search">
+                                        <el-select class="search_a" v-model="app.user.search_dbnote.server_id" placeholder="可选择服务器" clearable @change="get_dbnotes">
+                                            <el-option v-for="server in app.user.servers" :label="server.name" :value="server.server_id"></el-option>
+                                        </el-select>
+                                        <el-input class="search_b" v-model="app.user.search_dbnote.dbnote_keyword" placeholder="可输入关键词" clearable @input.native="get_dbnotes"></el-input>
+                                    </div>
+                                    <el-table :data="app.user.dbnotelist" highlight-current-row @current-change="get_dbnote" v-loading="app.user.loading.dbnote_loading">
+                                        <el-table-column prop="id" label="ID" min-width="20%"></el-table-column>
+                                        <el-table-column prop="server_name" label="所属服务器" min-width="40%"></el-table-column>
+                                        <el-table-column prop="name" label="名称" min-width="40%"></el-table-column>
+                                    </el-table>
+                                    <el-dialog title="修改信息" :visible.sync="app.user.dbnote_dialog.see" width="fit-content">
+                                        <el-button round type="success" @click="">确认添加</el-button>
+                                    </el-dialog>
+                                </div>
+                            </el-card>
                         </div>
                     </div>
                 </div>
@@ -215,6 +233,10 @@
                             db_note:null,
                             user_keyword:null,
                         },
+                        search_dbnote:{
+                            server_id:null,
+                            dbnote_keyword:null
+                        },
                         search_props:{
                             value:"server_id",
                             label:"name",
@@ -222,13 +244,19 @@
                             temp:null
                         },
                         servers:[],
-                        userlist:[],
                         select_user:null,
                         select_user_bak:null,
+                        select_dbnote:null,
+                        select_dbnote_bak:null,
                         loading:{
-                            user_loading:0
+                            user_loading:0,
+                            dbnote_loading:0,
                         },
-                        tag_dialog:{
+                        user_tag_dialog:{
+                            see:false,
+                            value:null
+                        },
+                        dbnote_dialog:{
                             see:false,
                             value:null
                         }
@@ -361,6 +389,28 @@
                         ()=>self.app.user.loading.user_loading--
                     )
                 },
+                get_dbnotes:function(){
+                    let self=this
+                    self.app.user.loading.dbnote_loading++
+                    fetch_post('/ftpmanager/api/get_dbnote',self.app.user.search_dbnote).then(res=>{
+                        if (!res.code == 0) {
+                            self.$alert(res.err_msg, '异常操作', {
+                                confirmButtonText: '确定',
+                                type: 'error'
+                            })
+                        } else {
+                            res.data.map(e=>e.server_name=self.app.index.servers_dict[e.server_id].name || e.server_id)
+                            self.app.user.dbnotelist=res.data
+                        }
+                    }).finally(
+                        ()=>self.app.user.loading.dbnote_loading--
+                    )
+                },
+                get_dbnote:function(row){
+                    this.app.user.dbnote_dialog.see=true;
+                    this.app.user.select_dbnote=deepCopy(row);
+                    this.app.user.select_dbnote_bak=deepCopy(row);
+                },
                 user_update:function(){
                     return {
                         change:()=>{
@@ -392,7 +442,7 @@
                         },
                         remove:()=>{},
                         default:()=>{
-                            this.app.user.select_user=this.app.user.select_user_bak
+                            this.app.user.select_user=deepCopy(this.app.user.select_user_bak)
                         },
                         back:()=>{
                             this.app.user.select_user_bak=null
@@ -404,19 +454,24 @@
                         },
                         add_tag:()=>{
                             let self=this
-                            let server_id=self.app.user.tag_dialog.value[0],dbnote_id=self.app.user.tag_dialog.value[1]
+                            let server_id=self.app.user.user_tag_dialog.value[0],dbnote_id=self.app.user.user_tag_dialog.value[1]
                             for(let i of self.app.user.servers){
                                 if(i.server_id==server_id){
                                     for(let j of i.children){
-                                        if(j.server_id=dbnote_id){
+                                        if(j.server_id==dbnote_id){
+                                            for(let q of self.app.user.select_user.user_dbnote)if(q.id==dbnote_id){
+                                                self.app.user.user_tag_dialog.see=false
+                                                self.app.user.user_tag_dialog.value=[]
+                                                return
+                                            }
                                             self.app.user.select_user.user_dbnote.push({id:dbnote_id,name:j.name,server_id:server_id,more:j.more});
                                             break
                                         }
                                     }
                                 }
                             }
-                            self.app.user.tag_dialog.see=false
-                            self.app.user.tag_dialog.value=[]
+                            self.app.user.user_tag_dialog.see=false
+                            self.app.user.user_tag_dialog.value=[]
                         }
                     }
                 }
