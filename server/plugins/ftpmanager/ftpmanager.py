@@ -146,7 +146,7 @@ class ftpmanager:
             data=await request.post()
             if not expect(data,['server_id','db_note','user_keyword']):return web.json_response({'code':-1,'err_msg':'参数不完整'})
             #if not data['server_id'] in self.super._server_table:return web.json_response({'code':-1,'err_msg':'参数错误'})
-            sql="select distinct users.user_id,users.name,users.mail from (users inner join relation on users.user_id=relation.user) inner join db_note on relation.db_note=db_note.id"
+            sql="select distinct users.user_id,users.name,users.mail from (users left join relation on users.user_id=relation.user) left join db_note on relation.db_note=db_note.id"
             want_filt=[]
             if data['server_id']:
                 want_filt.append("db_note.server_id=:server_id")
@@ -173,6 +173,9 @@ class ftpmanager:
             if not expect(data,['user_id','user_info','user_dbnote']) or not expect(data['user_dbnote'],['addTags','removeTags']):return web.json_response({'code':-1,'err_msg':'参数不完整'})
             user_info={i:data['user_info'][i] for i in data['user_info'] if i in ['name','password','mail']}
             if len(user_info)>0:
+                if(data['user_id']):user_info['user_id']=data['user_id']
+                sql="insert or ignore into users("+','.join(user_info)+') values (:'+',:'.join(user_info)+')'
+                self.super._helper.insert('users',dicts=user_info,special_sql=sql)
                 self.super._helper.update('users',user_info,filter_dict={'user_id':data['user_id']})
             change_dbnote=data['user_dbnote']
             if len(change_dbnote['removeTags'])>0:
@@ -188,7 +191,14 @@ class ftpmanager:
                 except:
                     return web.json_response({'code':-1,'err_msg':'写入异常，即将刷新'})
             return web.json_response({'code':0,'msg':'success'})
-        
+        @manager_required
+        async def user_remove_post(self,request):
+            data=await request.post()
+            if not expect(data,['user_id']):return web.json_response({'code':-1,'err_msg':'参数不完整'})
+            self.super._helper.delete('relation',{'user':data['user_id']})
+            self.super._helper.delete('users',{'user_id':data['user_id']})
+            return web.json_response({'code':0,'msg':'删除成功'})
+
         @manager_required
         async def get_dbnote_post(self,request):
             data=await request.post()
@@ -266,7 +276,7 @@ class sqlite_helper:
         self._db=sqlite3.connect(self._directory+'\\ftpmanager.db',check_same_thread=False,detect_types=sqlite3.PARSE_DECLTYPES)
         cursor=self._db.cursor()
         sql_init=[
-            'create table users (id integer primary key autoincrement not null, name text not null, user_id text not null,password text not null, mail text not null)',
+            'create table users (user_id integer primary key autoincrement not null, name text not null, password text not null, mail text not null)',
             'create table manager (id integer primary key autoincrement not null, name text not null, password text not null, mail text not null, permissions text)',
             'create table server (id integer primary key autoincrement not null, name text not null, server_id text not null, status int not null, more dict)',
             'create table db_note (id integer primary key autoincrement not null, name text not null, server_id text not null, more dict)',
@@ -298,10 +308,10 @@ class sqlite_helper:
         cursor.execute(sql,(name,password,mail,permissions))
         self._db.commit()
 
-    def _add_user(self,name,password,mail,db_note,server_id):
+    def _add_user(self,name,password,mail):
         cursor = self._db.cursor()
-        sql = f'insert into users{"" if not server_id else "_"+server_id } (name, user_id, password, mail, db_note) values (?,?,?,?,?)'
-        cursor.execute(sql, (name, uuid.uuid4().hex, password, mail, db_note))
+        sql = f'insert into users (name, password, mail) values (?,?,?,)'
+        cursor.execute(sql, (name, uuid.uuid4().hex, password, mail))
         self._db.commit()
 
     def _add_server(self,name,ip,status=0,more={}):

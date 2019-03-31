@@ -193,6 +193,11 @@ body{
     margin: 2vw;
     overflow-y: scroll;
 }
+.main_app_user .user_card .header{
+    display: flex;
+    align-items: center;
+    justify-content: space-between
+}
 .main_app_user .user_card::-webkit-scrollbar{
     display: none
 }

@@ -137,9 +137,14 @@
                         </div>
                         <div class="user_manage">
                             <el-card class="user_card">
-                                <div slot="header">用户管理</div>
+                                <div slot="header" class="header">
+                                    <div>用户管理</div>
+                                    <transition name="user_change">
+                                        <el-button v-if="!app.user.select_user && !app.user.add.user" type="primary" size="mini" @click="app.user.add.user=true,app.user.select_user={user_info:{},user_dbnote:[]},app.user.select_user_bak={user_info:{},user_dbnote:[]}">添加用户</el-button>
+                                    </transition>
+                                </div>
                                 <transition name="user_change" mode="out-in">
-                                    <div class="user_manage_query" v-if="!app.user.select_user" key="top">
+                                    <div class="user_manage_query" v-if="!app.user.select_user && !app.user.add.user" key="top">
                                         <div class="user_manage_query_search">
                                             <el-cascader class="search_a" :options="app.user.servers" :props="app.user.search_props" @change="load_dbnote" change-on-select clearable></el-cascader>
                                             <el-input class="search_b" placeholder="用户名或邮箱" v-model="app.user.search_user.user_keyword" @input.native="get_users" @clear="get_users" clearable>
@@ -151,16 +156,16 @@
                                             <el-table-column prop="mail" label="邮箱" min-width="50%"></el-table-column>
                                         </el-table>
                                     </div>
-                                    <div class="user_selected_manage" v-else key="button">
+                                    <div class="user_selected_manage" v-else key="user_form">
                                         <el-form v-model="app.user.select_user">
                                             <el-form-item label="用户名">
-                                                <el-input v-model="app.user.select_user.user_info.name"></el-input>
+                                                <el-input v-model="app.user.select_user.user_info.name" placeholder="请输入用户名" clearable></el-input>
                                             </el-form-item>
                                             <el-form-item label="用户邮箱">
-                                                <el-input v-model="app.user.select_user.user_info.mail"></el-input>
+                                                <el-input v-model="app.user.select_user.user_info.mail" placeholder="请输入用户邮箱" clearable></el-input>
                                             </el-form-item>
-                                            <el-form-item label="重置密码">
-                                                <el-input v-model="app.user.select_user.user_info.password" placeholder="请输入密码，留空不修改" show-password></el-input>
+                                            <el-form-item :label="app.user.add.user?'用户密码':'重置密码'">
+                                                <el-input v-model="app.user.select_user.user_info.password" :placeholder="app.user.add.user?'请输入用户密码':'留空不修改'" show-password></el-input>
                                             </el-form-item>
                                             <el-form-item label="当前标签">
                                                 <br>
@@ -173,8 +178,8 @@
                                             </el-dialog>
                                         </el-form>
                                         <div class="button_container">
-                                            <el-button size="small" round type="success" @click="user_update().change()">确认修改</el-button>
-                                            <el-button size="small" round type="danger" @click="user_update().remove()">删除用户</el-button>
+                                            <el-button size="small" round type="success" @click="user_update().change()">{{app.user.add.user?'确认添加':'确认修改'}}</el-button>
+                                            <el-button size="small" v-if="!app.user.add.user" round type="danger" @click="user_update().remove()">删除用户</el-button>
                                             <el-button size="small" round type="warning" @click="user_update().default()">重置</el-button>
                                             <el-button size="small" round type="primary" @click="user_update().back()">取消</el-button>
                                         </div>
@@ -183,24 +188,62 @@
                             </el-card>
                         </div>
                         <div class="dbnote_manage">
-                            <el-card  class="user_card">
-                                <div slot="header">标签管理</div>
-                                <div>
-                                    <div class="user_manage_query_search">
-                                        <el-select class="search_a" v-model="app.user.search_dbnote.server_id" placeholder="可选择服务器" clearable @change="get_dbnotes">
-                                            <el-option v-for="server in app.user.servers" :label="server.name" :value="server.server_id"></el-option>
-                                        </el-select>
-                                        <el-input class="search_b" v-model="app.user.search_dbnote.dbnote_keyword" placeholder="可输入关键词" clearable @input.native="get_dbnotes"></el-input>
-                                    </div>
-                                    <el-table :data="app.user.dbnotelist" highlight-current-row @current-change="get_dbnote" v-loading="app.user.loading.dbnote_loading">
-                                        <el-table-column prop="id" label="ID" min-width="20%"></el-table-column>
-                                        <el-table-column prop="server_name" label="所属服务器" min-width="40%"></el-table-column>
-                                        <el-table-column prop="name" label="名称" min-width="40%"></el-table-column>
-                                    </el-table>
-                                    <el-dialog title="修改信息" :visible.sync="app.user.dbnote_dialog.see" width="fit-content">
-                                        <el-button round type="success" @click="">确认添加</el-button>
-                                    </el-dialog>
+                            <el-card class="user_card">
+                                <div slot="header" class="header">
+                                    <div>标签管理</div>
+                                    <transition name="user_change">
+                                        <el-button v-if="!app.user.add.dbnote" type="primary" size="mini" @click="app.user.add.dbnote=true,app.user.select_dbnote={permissions:[],more_config:[]},app.user.select_dbnote_bak={permissions:[],more_config:[]}">添加标签</el-button>
+                                    </transition>
                                 </div>
+                                <transition name="user_change" mode="out-in">
+                                    <div v-if="!app.user.select_dbnote && !app.user.add.dbnote">
+                                        <div class="user_manage_query_search">
+                                            <el-select class="search_a" v-model="app.user.search_dbnote.server_id" placeholder="可选择服务器" clearable @change="get_dbnotes">
+                                                <el-option v-for="server in app.user.servers" :label="server.name" :value="server.server_id"></el-option>
+                                            </el-select>
+                                            <el-input class="search_b" v-model="app.user.search_dbnote.dbnote_keyword" placeholder="可输入关键词" clearable @input.native="get_dbnotes"></el-input>
+                                        </div>
+                                        <el-table :data="app.user.dbnotelist" highlight-current-row @current-change="get_dbnote" v-loading="app.user.loading.dbnote_loading">
+                                            <el-table-column prop="id" label="ID" min-width="20%"></el-table-column>
+                                            <el-table-column prop="server_name" label="所属服务器" min-width="40%"></el-table-column>
+                                            <el-table-column prop="name" label="名称" min-width="40%"></el-table-column>
+                                        </el-table>
+                                        <!--<el-dialog title="修改信息" :visible.sync="app.user.dbnote_dialog.see" width="fit-content">
+                                            <el-button round type="success" @click="">确认添加</el-button>
+                                        </el-dialog>-->
+                                    </div>
+                                    <div v-else key="dbnote_form">
+                                        <el-form>
+                                            <el-form-item label="所属服务器">
+                                                <el-select></el-select>
+                                            </el-form-item>
+                                            <el-form-item label="标签名">
+                                                <el-input v-model="app.user.select_dbnote.name"></el-input>
+                                            </el-form-item>
+                                            <el-form-item label="路径">
+                                                <el-input v-model="app.user.select_dbnote.path"></el-input>
+                                            </el-form-item>
+                                            <el-form-item label="权限">
+                                                <el-checkbox-group v-model="app.user.select_dbnote.permissions">
+                                                    <el-checkbox label="下载"></el-checkbox>
+                                                    <el-checkbox label="上传"></el-checkbox>
+                                                    <el-checkbox label="删除"></el-checkbox>
+                                                </el-checkbox-group>
+                                            </el-form-item>
+                                            <el-form-item label="额外选项">
+                                                <el-checkbox-group v-model="app.user.select_dbnote.more_config">
+                                                    <el-checkbox label="用户独立目录"></el-checkbox>
+                                                </el-checkbox-group>
+                                            </el-form-item>
+                                        </el-form>
+                                        <div class="button_container">
+                                            <el-button size="small" round type="success" @click="dbnote_update().change()">{{app.user.add.dbnote?'确认添加':'确认修改'}}</el-button>
+                                            <el-button size="small" v-if="!app.user.add.dbnote" round type="danger" @click="dbnote_update().remove()">删除标签</el-button>
+                                            <el-button size="small" round type="warning" @click="dbnote_update().default()">重置</el-button>
+                                            <el-button size="small" round type="primary" @click="dbnote_update().back()">取消</el-button>
+                                        </div>
+                                    </div>
+                                </transition>
                             </el-card>
                         </div>
                     </div>
@@ -259,6 +302,10 @@
                         dbnote_dialog:{
                             see:false,
                             value:null
+                        },
+                        add:{
+                            user:false,
+                            dbnote:false,
                         }
                     }
                 }
@@ -382,6 +429,7 @@
                                 type: 'error'
                             })
                         } else {
+                            if(!res.data.user_dbnote)res.data.user_dbnote=[];
                             self.app.user.select_user=deepCopy(res.data)
                             self.app.user.select_user_bak=deepCopy(res.data)
                         }
@@ -421,7 +469,7 @@
                             let b=self.app.user.select_user_bak.user_dbnote.map(e=>e.id)
                             for(let i of a)if(b.indexOf(i)==-1)addTags.push(i)
                             for(let i of b)if(a.indexOf(i)==-1)removeTags.push(i)
-                            let change_pack={'user_id':self.app.user.select_user.user_info.user_id,'user_info':hasChanged(self.app.user.select_user_bak.user_info,self.app.user.select_user.user_info),'user_dbnote':{'addTags':addTags,'removeTags':removeTags}}
+                            let change_pack={'user_id':self.app.user.select_user.user_info.user_id||null,'user_info':hasChanged(self.app.user.select_user_bak.user_info,self.app.user.select_user.user_info),'user_dbnote':{'addTags':addTags,'removeTags':removeTags}}
                             fetch_json('/ftpmanager/api/user_change',change_pack).then(res=>{
                                 if (!res.code == 0) {
                                     self.$alert(res.err_msg, '异常操作', {
@@ -431,29 +479,55 @@
                                     setTimeout(()=>window.location.href = window.location.href,3000)
                                 } else {
                                     self.$message.success("修改成功");
-                                    self.app.user.search_user.server_id=null
-                                    self.app.user.search_user.db_note=null
-                                    self.app.user.search_user.user_keyword=null
-                                    self.app.user.userlist=[]
+                                    self.app.user.search_user.server_id=null;
+                                    self.app.user.search_user.db_note=null;
+                                    self.app.user.search_user.user_keyword=null;
+                                    self.app.user.userlist=[];
                                     self.user_update().back();
+                                    self.refresh_users_info();
                                 }
                             })
-
                         },
-                        remove:()=>{},
+                        remove:()=>{
+                            let self=this;
+                            self.$confirm('这将清除用户的所有信息','您确认删除用户吗',{
+                                confirmButtonText:'确定',
+                                cancelButtonText:'取消',
+                                type:'warning'
+                            }).then(()=>{
+                                fetch_post('/ftpmanager/api/user_remove',{user_id:self.app.user.select_user.user_info.user_id}).then(res=>{
+                                    if (!res.code == 0) {
+                                    self.$alert(res.err_msg, '异常操作', {
+                                        confirmButtonText: '确定',
+                                        type: 'error'
+                                    })
+                                    setTimeout(()=>window.location.href = window.location.href,3000)
+                                    } else {
+                                        self.$message.success("删除成功");
+                                        self.app.user.search_user.server_id=null;
+                                        self.app.user.search_user.db_note=null;
+                                        self.app.user.search_user.user_keyword=null;
+                                        self.app.user.userlist=[];
+                                        self.user_update().back();
+                                        self.refresh_users_info();
+                                    }
+                                })
+                            }).catch(()=>{})
+                        },
                         default:()=>{
-                            this.app.user.select_user=deepCopy(this.app.user.select_user_bak)
+                            this.app.user.select_user=deepCopy(this.app.user.select_user_bak);
                         },
                         back:()=>{
-                            this.app.user.select_user_bak=null
-                            this.app.user.select_user=null
+                            this.app.user.add.user=false;
+                            this.app.user.select_user_bak=null;
+                            this.app.user.select_user=null;
                         },
                         remove_tag:(tag)=>{
-                            let self=this
-                            self.app.user.select_user.user_dbnote.splice(self.app.user.select_user.user_dbnote.indexOf(tag),1)
+                            let self=this;
+                            self.app.user.select_user.user_dbnote.splice(self.app.user.select_user.user_dbnote.indexOf(tag),1);
                         },
                         add_tag:()=>{
-                            let self=this
+                            let self=this;
                             let server_id=self.app.user.user_tag_dialog.value[0],dbnote_id=self.app.user.user_tag_dialog.value[1]
                             for(let i of self.app.user.servers){
                                 if(i.server_id==server_id){
@@ -472,6 +546,28 @@
                             }
                             self.app.user.user_tag_dialog.see=false
                             self.app.user.user_tag_dialog.value=[]
+                        }
+                    }
+                },
+                refresh_users_info:function(){
+                    let self=this;
+                        fetch_get('/ftpmanager/api/get_base_user_info').then(res=>{
+                        self.app.user.users=res;
+                    })
+                },
+                dbnote_update:function(){
+                    return {
+                        change:()=>{
+
+                        },
+                        remove:()=>{
+
+                        },
+                        back:()=>{
+                            let self=this;
+                            this.app.user.add.dbnote=false;
+                            this.app.user.select_dbnote=null;
+                            this.app.user.select_dbnote_bak=null;
                         }
                     }
                 }
@@ -508,9 +604,7 @@
                     }
                     self.app.user.servers=temp;
                 })
-                fetch_get('/ftpmanager/api/get_base_user_info').then(res=>{
-                    self.app.user.users=res;
-                })
+                self.refresh_users_info();
                 let just1=setInterval(() => {
                     fetch_get('/ftpmanager/api/async_info').then(res => {
                         let result=[];
