@@ -192,7 +192,7 @@
                                 <div slot="header" class="header">
                                     <div>标签管理</div>
                                     <transition name="user_change">
-                                        <el-button v-if="!app.user.add.dbnote" type="primary" size="mini" @click="app.user.add.dbnote=true,app.user.select_dbnote={permissions:[],more_config:[]},app.user.select_dbnote_bak={permissions:[],more_config:[]}">添加标签</el-button>
+                                        <el-button v-if="!app.user.select_dbnote && !app.user.add.dbnote" type="primary" size="mini" @click="app.user.add.dbnote=true,app.user.select_dbnote={permissions:[],more_config:[]},app.user.select_dbnote_bak={permissions:[],more_config:[]}">添加标签</el-button>
                                     </transition>
                                 </div>
                                 <transition name="user_change" mode="out-in">
@@ -215,7 +215,9 @@
                                     <div v-else key="dbnote_form">
                                         <el-form>
                                             <el-form-item label="所属服务器">
-                                                <el-select></el-select>
+                                                <el-select :disabled="!app.user.add.dbnote" v-model="app.user.select_dbnote.server_id">
+                                                    <el-option v-for="server in app.user.servers" :label="server.name" :value="server.server_id"></el-option>
+                                                </el-select>
                                             </el-form-item>
                                             <el-form-item label="标签名">
                                                 <el-input v-model="app.user.select_dbnote.name"></el-input>
@@ -440,13 +442,14 @@
                 get_dbnotes:function(){
                     let self=this
                     self.app.user.loading.dbnote_loading++
-                    fetch_post('/ftpmanager/api/get_dbnote',self.app.user.search_dbnote).then(res=>{
+                    fetch_post('/ftpmanager/api/get_dbnotes',self.app.user.search_dbnote).then(res=>{
                         if (!res.code == 0) {
                             self.$alert(res.err_msg, '异常操作', {
                                 confirmButtonText: '确定',
                                 type: 'error'
                             })
                         } else {
+                            if(!res.data)return;
                             res.data.map(e=>e.server_name=self.app.index.servers_dict[e.server_id].name || e.server_id)
                             self.app.user.dbnotelist=res.data
                         }
@@ -455,9 +458,16 @@
                     )
                 },
                 get_dbnote:function(row){
-                    this.app.user.dbnote_dialog.see=true;
-                    this.app.user.select_dbnote=deepCopy(row);
-                    this.app.user.select_dbnote_bak=deepCopy(row);
+                    let self=this;
+                    self.app.user.loading.dbnote_loading++;
+                    fetch_post('/ftpmanager/api/get_dbnote',{'id':row.id}).then(res=>{
+                        self.app.user.dbnote_dialog.see=true;
+                        self.app.user.select_dbnote=deepCopy(res.data);
+                        self.app.user.select_dbnote_bak=deepCopy(res.data);
+                    }).finally(
+                        ()=>self.app.user.loading.dbnote_loading--
+                    )
+                    
                 },
                 user_update:function(){
                     return {
@@ -558,10 +568,32 @@
                 dbnote_update:function(){
                     return {
                         change:()=>{
-
+                            let self=this;
+                            if(!self.app.user.select_dbnote.id)self.app.user.select_dbnote.id=null;
+                            fetch_json('/ftpmanager/api/dbnote_change',self.app.user.select_dbnote).then(res=>{
+                                if (!res.code == 0) {
+                                    self.$alert(res.err_msg, '异常操作', {
+                                        confirmButtonText: '确定',
+                                        type: 'error'
+                                    })
+                                } else {
+                                    self.$message.success("更新成功");
+                                    self.dbnote_update().back();
+                                }
+                            })
                         },
                         remove:()=>{
-
+                            fetch_post('/ftpmanager/api/dbnote_remove', {'id':self.app.user.select_dbnote.id}).then(res => {
+                                if (!res.code == 0) {
+                                    self.$alert(res.err_msg, '异常操作', {
+                                        confirmButtonText: '确定',
+                                        type: 'error'
+                                    })
+                                } else {
+                                    self.$message.success("删除成功");
+                                    self.dbnote_update().back();
+                                }
+                            })
                         },
                         back:()=>{
                             let self=this;

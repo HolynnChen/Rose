@@ -14,7 +14,8 @@ import hashlib
 import uuid,sys,traceback
 import async_timeout
 import threading
-import pickle
+#import pickle
+import json
 
 APP_KEY='1234567890'
 __all__=['ftpmanager']
@@ -200,10 +201,10 @@ class ftpmanager:
             return web.json_response({'code':0,'msg':'删除成功'})
 
         @manager_required
-        async def get_dbnote_post(self,request):
+        async def get_dbnotes_post(self,request):
             data=await request.post()
             if not expect(data,['server_id','dbnote_keyword']):return web.json_response({'code':-1,'err_msg':'参数不完整'})
-            sql="select * from db_note"
+            sql="select id,name,server_id from db_note"
             want_filt=[]
             if data['server_id']:
                 want_filt.append("server_id=:server_id")
@@ -215,8 +216,26 @@ class ftpmanager:
             return web.json_response({'code':0,'data':self.super._helper.search('db_note',special_sql=sql,fetchlimit=-1,filter_dict=filter_dict)})
 
         @manager_required
+        async def get_dbnote_post(self,request):
+            data=await request.post()
+            if not expect(data,['id']):return web.json_response({'code':-1,'err_msg':'参数不完整'})
+            result=self.super._helper.search('db_note',filter_dict={'id':data['id']})
+            if not result:return web.json_response({'code':-1,'err_msg':'找不到相应标签'})
+            result['more']=result.get('more',{})
+            result['path']=result['more'].get('path','')
+            result['permissions']=result['more'].get('permissions',[])
+            result['more_config']=result['more'].get('more_config',[])
+            del result['more']
+            return web.json_response({'code':0,'data':result})
+        
+        @manager_required
         async def dbnote_change_post(self,request):
             data=await request.json()
+            if not expect(data,['id','server_id','name','path','permissions','more_config']):return web.json_response({'code':-1,'err_msg':'参数不完整'})
+            filter_dict={'server_id':data['server_id'],'name':data['name'],'more':{'path':data['path'],'permissions':data['permissions'],'more_config':data['more_config']}}
+            if data['id']:filter_dict['id']=data['id']
+            sql="insert or replace into db_note("+','.join(filter_dict)+") values(:"+',:'.join(filter_dict)+")"
+            self.super._helper.insert('user',filter_dict,special_sql=sql)
             return web.json_response({'code':0,'msg':'success'})
 
     
@@ -291,8 +310,8 @@ class sqlite_helper:
 
     def __init__(self):
         import os
-        sqlite3.register_adapter(dict,pickle.dumps)
-        sqlite3.register_converter('dict',pickle.loads)
+        sqlite3.register_adapter(dict,json.dumps)
+        sqlite3.register_converter('dict',json.loads)
         self._directory,_=os.path.split(os.path.realpath(__file__))
         if not os.path.isfile(self._directory+'\\ftpmanager.db'):
             print('FtpManager:数据库文件不存在，尝试创建并初始化')
