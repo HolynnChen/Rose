@@ -27,7 +27,7 @@ class ftpmanager:
         ws = await connect_session.ws_connect(co['ws_address'],heartbeat=30, receive_timeout=60,headers={'cookie':str(resp.cookies).split(':')[1]})
         self.__ws_tool=ws_tool(ws)
         try:
-            await ws.send_json({'target':'update_info','parameters':{'server_id':NAME,'disk_info':ftpmanager_tools.get_disk_info()},'uuid':uuid.uuid1().hex})
+            await self.__ws_tool.send({'target':'update_info','parameters':{'server_id':NAME,'disk_info':ftpmanager_tools.get_disk_info()}})
             async for msg in ws:
                 if msg.type == aiohttp.WSMsgType.CLOSED:
                     print('收到关闭信息')

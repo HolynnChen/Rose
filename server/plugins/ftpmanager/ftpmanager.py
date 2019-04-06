@@ -264,12 +264,14 @@ class ftpmanager:
             async for msg in ws:
                 json = msg.json()
                 if expect(json,['data','uuid']):
-                    self._wst.set(json['uuid'],json['data'])
-                elif expect(json,['target','parameters','uuid']):
-                    if hasattr(self.__tools,json['target']):
-                        result=getattr(self.__tools,json['target'])(json['parameters'])
-                        await self._wst.respon(server_id,json['uuid'],result)
-                    pass
+                    if expect(json['data'],['target','parameters','uuid']):
+                        if hasattr(self.__tools,json['data']['target']):
+                            result=getattr(self.__tools,json['data']['target'])(json['data']['parameters'])
+                            await self._wst.respon(server_id,json['uuid'],result)
+                        pass
+                    else:
+                        self._wst.set(json['uuid'],json['data'])
+                    
             return ws
         except asyncio.CancelledError:
             self._server_table[server_id]['status']=0
@@ -300,7 +302,8 @@ class sqlite_helper:
             'create table server (id integer primary key autoincrement not null, name text not null, server_id text not null, status int not null, more dict)',
             'create table db_note (id integer primary key autoincrement not null, name text not null, server_id text not null, more dict)',
             'create table relation (id integer primary key autoincrement not null, user integer not null, db_note integer not null)',
-            'create unique index only on relation (user,db_note)'
+            'create unique index only on relation (user,db_note)',
+            'create table operation_log (id interger primary key autoincrement not null,table text not null,operation text not null, data dict)'
         ]
         for i in sql_init:cursor.execute(i)
         self._db.commit()
@@ -403,7 +406,7 @@ class sqlite_helper:
         if not self.search('server',{'server_id':server_id}):
             self.insert('server',{'server_id':server_id,'status':1,'name':server_id,'more':{}})
             cursor=self._db.cursor()
-            cursor.execute(f'create table logs_{server_id} (id integer primary key autoincrement not null,sql text not null, data dict)')
+            cursor.execute(f'create table logs_{server_id} (id integer primary key autoincrement not null,operation text not null, data dict)')
             self._db.commit()
             return
         self.change_server_status(server_id,1)
@@ -432,11 +435,16 @@ class ws_tool:
     async def send_all(self,json):
         if not len(self.wss):return []
         return await sorted_wait([self.send(i,json) for i in self.wss])
-    
     async def close(self):
         todo=[i.close() for i in self.wss.values()]
         if not len(todo):return
         await asyncio.wait(todo)
+
+    '''以下是ws功能区'''
+    async def async_user(self):
+        result=await self.send_all({'type':'ftpmanager_tools','cmd':'async_user'})
+        for i in result:
+            self.ws_msg_dict.async_del(i)
 class ftp_tools:
     def __init__(self,master,helper):
         self._master=master
@@ -447,3 +455,18 @@ class ftp_tools:
             more=self._helper.search('server',{'server_id':params['server_id']})['more']
             more['disk_info']=params['disk_info']
             self._helper.update('server',{'more':more},{'server_id':params['server_id']})
+    
+    def async_operation(self,index_id):
+        if index_id<1:
+            return self._helper.search('operation_log',fetchlimit=-1)
+        else:
+            return self._helper.search('operation_log',fetchlimit=-1,special_sql="select * from operation_log where id>:id",filter_dict={'id':index_id})
+    
+    def async_dbnote(self,server_id,index_id):
+        if server_id not in self._master._server_table:
+            return None
+        if index_id<1:
+            return self._helper.search(f'logs_{server_id}',fetchlimit=-1)
+        else:
+            return self._helper.search(f'logs_{server_id}',fetchlimit=-1,special_sql=f'select * from logs_{server_id} where id>:id',filter_dict={'id':index_id})
+
