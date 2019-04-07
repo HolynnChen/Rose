@@ -8,14 +8,18 @@ co={
     'ws_address':'http://127.0.0.1:8123/ftpmanager/ws_keep',
     'ws_confirm':'http://127.0.0.1:8123/ftpmanager/ws_confirm'}
 import uuid,hashlib
+import sqlite3,os,json
 SRC=hashlib.md5(uuid.UUID(int = uuid.getnode()).hex[-12:].encode()).hexdigest()
 APP_KEY='1234567890'
 NAME=hashlib.sha256((SRC+APP_KEY).encode()).hexdigest()
 var={}
 def expect(data,target):return all([i in data for i in target])
 class ftpmanager:
-    __ws_tool=None
-    def __init__(self):
+    ws_tool=None
+    def __init__(self,loop=None):
+        self.ftpmanager_tools=ftpmanager_tools(self)
+        self._helper=sqlite_heler()
+        self.loop=loop or asyncio.get_event_loop()
         return
     async def connect(self):
         connect_session = aiohttp.ClientSession()
@@ -25,9 +29,9 @@ class ftpmanager:
             print('APP_KEY错误')
             return
         ws = await connect_session.ws_connect(co['ws_address'],heartbeat=30, receive_timeout=60,headers={'cookie':str(resp.cookies).split(':')[1]})
-        self.__ws_tool=ws_tool(ws)
+        self.ws_tool=ws_tool(ws,loop=loop)
         try:
-            await self.__ws_tool.send({'target':'update_info','parameters':{'server_id':NAME,'disk_info':ftpmanager_tools.get_disk_info()}})
+            await self.ws_tool.send({'target':'update_info','parameters':{'server_id':NAME,'disk_info':self.ftpmanager_tools.get_disk_info()}})
             async for msg in ws:
                 if msg.type == aiohttp.WSMsgType.CLOSED:
                     print('收到关闭信息')
@@ -41,13 +45,20 @@ class ftpmanager:
                     if not expect(resp,['data','uuid']):
                         print('服务端发来不支持的信息',resp)
                         continue
-                    todo=resp['data']
-                    if not expect(todo,['type','cmd']):
-                        print('服务端发来不支持的指令',resp)
-                        continue
-                    if todo['type']=='ftpmanager_tools':
-                        if hasattr(ftpmanager_tools,todo['cmd']) and callable(getattr(ftpmanager_tools,todo['cmd'])):
-                            await self.__ws_tool.respon(resp['uuid'],getattr(ftpmanager_tools,todo['cmd'])(**(todo.get('data',{}))))
+                    if expect(resp['data'],['type','cmd']):
+                        todo=resp['data']
+                        if todo['type']=='ftpmanager_tools':
+                            if hasattr(self.ftpmanager_tools,todo['cmd']) and callable(getattr(self.ftpmanager_tools,todo['cmd'])):
+                                if asyncio.iscoroutinefunction(getattr(self.ftpmanager_tools,todo['cmd'])):
+                                    async def inner():
+                                        result=await getattr(self.ftpmanager_tools,todo['cmd'])(**(todo.get('data',{})))
+                                        if result:await self.ws_tool.respon(resp['uuid'],result)
+                                    asyncio.ensure_future(inner())
+                                else:
+                                    result=getattr(self.ftpmanager_tools,todo['cmd'])(**(todo.get('data',{})))
+                                    if result:await self.ws_tool.respon(resp['uuid'],result)
+                    else:
+                        self.ws_tool.set(resp['uuid'],resp['data'])
                 except:
                     continue
         except asyncio.CancelledError:
@@ -58,32 +69,184 @@ class ftpmanager:
            return ws
         return
 
+class async_Dict():
+    '''使用该类可作为异步字典。写入是实时的，获取是异步的。支持异步del，可用于超时删除。'''
+    def __init__(self,loop=None):
+        self._loop=loop or asyncio.get_event_loop()
+        self._getters={}
+        self._dict={}
+        self._del={}
+    def set(self,key,value):
+        '''实时写入
+        :param key:字典的key
+        :param value: 字典的value
+        :return: None
+        '''
+        if key in self._del:
+            return self._del.pop(key)
+        self._dict[key]=value
+        self._wakeup(key)
+    @asyncio.coroutine
+    def get(self,key):
+        '''异步写入
+        :param key: 字典的key
+        :return: None
+        '''
+        while key not in self._dict:
+            getter=self._loop.create_future()
+            self._getters[key]=getter
+            try:
+                yield from getter
+            except:
+                getter.cancel()
+                try:
+                    del self._getters[key]
+                except KeyError:
+                    pass
+                raise
+        return self._dict.pop(key)
+    
+    def async_del(self,key):
+        if key in self._dict:del self._dict[key]
+        else:self._del[key]=True
+    def _wakeup(self,key):
+        if key in self._getters:
+            getter=self._getters.pop(key)
+            if not getter.done():
+                getter.set_result(None)
+
 class ws_tool:
     ws_connect=None
-    __Queue={}
-    def __init__(self,ws):
+    def __init__(self,ws,loop=None):
         self.ws_connect=ws
+        self.msg_dict=async_Dict(loop or asyncio.get_event_loop())
     async def send(self,json,s=None):
         s=s or uuid.uuid1().hex
-        self.__Queue[s]=asyncio.Queue(maxsize=1)
         await self.ws_connect.send_json({'data':json,'uuid':s})
         return s
-    async def get(self,s,timeout=5):
+    async def get(self,s,timeout=10):
         try:
             async with async_timeout.timeout(timeout):
-                json=await self.__Queue[s].get()
+                json=await self.msg_dict.get(s)
                 return json
         except (asyncio.TimeoutError,asyncio.CancelledError):
+            self.msg_dict.async_del(s)
             return None
-        finally:
-            del self.__Queue[s]
-    async def respon(self,s,json):
-        await self.ws_connect.send_json({'data':json,'uuid':s})
+    def set(self,s,v):self.msg_dict.set(s,v)
+    async def respon(self,s,json):await self.send(json,s=s)
 
 class ftpmanager_tools:
+    def __init__(self,super_class):
+        self.super=super_class
     @staticmethod
     def get_disk_info():
         return {i:psutil.disk_usage(i) for i in [j.device for j in psutil.disk_partitions()]}
+    
+    async def async_operation(self):
+        key=await self.super.ws_tool.send({'target':'async_operation','parameters':{'index_id':self.super._helper.get_id('operation')}})
+        result=await self.super.ws_tool.get(key)
+        if not result or not len(result):return
+        for i in result:
+            if i['operation']=='user_change':
+                self.user_change(i['data'])
+            elif i['operation']=='user_remove':
+                self.user_remove(i['data'])
+        self.super._helper.update('times',{'index_id':result[-1]['id']},{'name':'operation'})
+    
+    async def async_dbnotes(self):
+        key=await self.super.ws_tool.send({'target':'async_dbnotes','parameters':{'index_id':self.super._helper.get_id('dbnotes'),'server_id':NAME}})
+        result=await self.super.ws_tool.get(key)
+        if not result or not len(result):return
+        for i in result:
+            if i['operation']=='dbnote_change':
+                self.dbnote_change(i['data'])
+            elif i['operation']=='dbnote_remove':
+                #self.dbnote_remove(i['data'])
+                pass
+        self.super._helper.update('times',{'index_id':result[-1]['id']},{'name':'dbnotes'})
+
+    def user_change(self,data):
+            user_info={i:data['user_info'][i] for i in data['user_info'] if i in ['name','password','mail']}
+            if len(user_info)>0:
+                if data['user_id']:user_info['user_id']=data['user_id']
+                sql="insert or ignore into users("+','.join(user_info)+') values (:'+',:'.join(user_info)+')'
+                self.super._helper.insert('users',dicts=user_info,special_sql=sql)
+                self.super._helper.update('users',user_info,filter_dict={'user_id':data['user_id']})
+            change_dbnote=data['user_dbnote']
+            if len(change_dbnote['removeTags'])>0:
+                sql="delete from relation where user=:user_id and db_note in (:"+",".join(map(str,range(len(change_dbnote['removeTags']))))+")"
+                filter_dict={str(i):change_dbnote['removeTags'][i] for i in range(len(change_dbnote['removeTags']))}
+                filter_dict['user_id']=data['user_id']
+                self.super._helper.delete('relation',special_sql=sql,filter_dict=filter_dict)
+            if len(change_dbnote['addTags'])>0:
+                sql="insert into relation (user,db_note) values (:user_id,:db_note)"
+                dicts=[{'user_id':data['user_id'],"db_note":i} for i in change_dbnote['addTags']]
+                self.super._helper.insert('relation',special_sql=sql,dicts=dicts)
+    
+    def user_remove(self,data):
+            self.super._helper.delete('relation',{'user':data['user_id']})
+            self.super._helper.delete('users',{'user_id':data['user_id']})
+    
+    def dbnote_change(self,data):
+            filter_dict={'server_id':data['server_id'],'name':data['name'],'more':{'path':data['path'],'permissions':data['permissions'],'more_config':data['more_config']}}
+            if data['id']:filter_dict['id']=data['id']
+            sql="insert or replace into db_note("+','.join(filter_dict)+") values(:"+',:'.join(filter_dict)+")"
+            self.super._helper.insert('user',filter_dict,special_sql=sql)
+
+class sqlite_heler:
+    def __init__(self):
+        self._directory,_=os.path.split(os.path.realpath(__file__))
+        sqlite3.register_adapter(dict,json.dumps)
+        sqlite3.register_converter('dict',json.loads)
+        if not os.path.isfile(self._directory+'\\ftpmanager.db'):
+            print('FtpManager:数据库文件不存在，尝试创建并初始化')
+            self._db=sqlite3.connect(self._directory+'\\ftpmanager.db',check_same_thread=False,detect_types=sqlite3.PARSE_DECLTYPES)
+            cursor=self._db.cursor()
+            sql_init=[
+                'create table users (user_id integer primary key autoincrement not null, name text not null, password text not null, mail text not null)',
+                'create table db_note (id integer primary key autoincrement not null, name text not null, server_id text not null, more dict)',
+                'create table relation (id integer primary key autoincrement not null, user integer not null, db_note integer not null)',
+                'create unique index only on relation (user,db_note)',
+                'create table times (name text primary key not null,index_id integer not null)',
+                'insert into times (name,index_id) values ("operation",0)',
+                'insert into times (name,index_id) values ("dbnotes",0)'
+            ]
+            for i in sql_init:cursor.execute(i)
+            self._db.commit()
+            print('FtpManager:数据库初始化完毕')
+        else:
+            self._db=sqlite3.connect(self._directory+'\\ftpmanager.db')
+
+    def insert(self,table,dicts,special_sql=None):
+        cursor=self._db.cursor()
+        if isinstance(dicts,dict):
+            sql=special_sql or f'insert into {table} ({",".join(dicts.keys())}) values ({",".join([":"+i for i in dicts.keys()])})'
+            cursor.execute(sql,dicts)
+        else:
+            sql=special_sql or f'insert into {table} ({",".join(dicts[0].keys())}) values ({",".join([":"+i for i in dicts[0].keys()])})'
+            cursor.executemany(sql,dicts)
+        self._db.commit()
+    def update(self,table,value_dict,filter_dict={},special_sql=None):
+        cursor = self._db.cursor()
+        temp=",".join([i+'=?' for i in value_dict.keys()])
+        sql = special_sql or f'update {table} set {temp}'
+        if filter_dict and len(filter_dict) and not special_sql:
+            sql+=' where '
+            sql+=' and '.join([i+'=?' for i in filter_dict.keys()])
+        cursor.execute(sql,tuple(list(value_dict.values())+list(filter_dict.values())))
+        self._db.commit()
+    def delete(self,table,filter_dict={},special_sql=None):
+        cursor=self._db.cursor()
+        sql = special_sql or f'delete from {table}'
+        if len(filter_dict) and not special_sql:
+            sql+=' where '
+            sql+=' and '.join([i+'=:'+i for i in filter_dict.keys()])
+        cursor.execute(sql,filter_dict)
+        self._db.commit()
+    def get_id(self,name):
+        cursor=self._db.cursor()
+        cursor.execute(f'select index_id from times where name=:name',{'name':name})
+        return cursor.fetchone()[0]
 
 async def Timer():
     loop=asyncio.get_event_loop()
@@ -99,6 +262,9 @@ async def Timer():
         except (asyncio.TimeoutError, asyncio.CancelledError):
             continue
 
+async def init():
+    await ftpmanager().connect()
+
 def Timer_add(func,time):var['Timer'].put_nowait((func,time))
 def keep_Timer():
     loop = asyncio.new_event_loop()
@@ -106,11 +272,11 @@ def keep_Timer():
     loop.run_until_complete(Timer())
 
 Thread(target=keep_Timer).start()
-temp=ftpmanager()
 loop=None
 if sys.platform=="win32":
     loop=asyncio.ProactorEventLoop()
     asyncio.set_event_loop(loop)
 else:
     loop=asyncio.get_event_loop()
+temp=ftpmanager(loop=loop)
 loop.run_until_complete(temp.connect())
