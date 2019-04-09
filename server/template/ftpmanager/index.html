@@ -226,10 +226,9 @@
                                                 <el-input v-model="app.user.select_dbnote.path"></el-input>
                                             </el-form-item>
                                             <el-form-item label="权限">
+                                                <br>
                                                 <el-checkbox-group v-model="app.user.select_dbnote.permissions">
-                                                    <el-checkbox label="下载"></el-checkbox>
-                                                    <el-checkbox label="上传"></el-checkbox>
-                                                    <el-checkbox label="删除"></el-checkbox>
+                                                    <el-checkbox v-for="(value,key) in app.checkbox_group_value" :label="key">{{value}}</el-checkbox>
                                                 </el-checkbox-group>
                                             </el-form-item>
                                             <el-form-item label="额外选项">
@@ -262,6 +261,7 @@
                 },
                 app: {
                     connect:true,
+                    checkbox_group_value:{'FileRead':'文件读取','FileWrite':'文件写入','FileDelete':'文件删除','DirCerate':'创建目录','DirList':'列出目录','DirSubdirs':'列出子目录'},
                     page:1,
                     index: {
                         servers: [],

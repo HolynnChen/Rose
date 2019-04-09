@@ -9,6 +9,8 @@ co={
     'ws_confirm':'http://127.0.0.1:8123/ftpmanager/ws_confirm'}
 import uuid,hashlib
 import sqlite3,os,json
+import xml.etree.ElementTree as ET
+
 SRC=hashlib.md5(uuid.UUID(int = uuid.getnode()).hex[-12:].encode()).hexdigest()
 APP_KEY='1234567890'
 NAME=hashlib.sha256((SRC+APP_KEY).encode()).hexdigest()
@@ -20,6 +22,7 @@ class ftpmanager:
         self.ftpmanager_tools=ftpmanager_tools(self)
         self._helper=sqlite_heler()
         self.loop=loop or asyncio.get_event_loop()
+        self.xml_helper=xml_helper(os.path.split(os.path.realpath(__file__))[0]+'\\Filezilla Server.xml',self)
         return
     async def connect(self):
         connect_session = aiohttp.ClientSession()
@@ -166,22 +169,23 @@ class ftpmanager_tools:
         self.super._helper.update('times',{'index_id':result[-1]['id']},{'name':'dbnotes'})
 
     def user_change(self,data):
-            user_info={i:data['user_info'][i] for i in data['user_info'] if i in ['name','password','mail']}
-            if len(user_info)>0:
-                if data['user_id']:user_info['user_id']=data['user_id']
-                sql="insert or ignore into users("+','.join(user_info)+') values (:'+',:'.join(user_info)+')'
-                self.super._helper.insert('users',dicts=user_info,special_sql=sql)
-                self.super._helper.update('users',user_info,filter_dict={'user_id':data['user_id']})
-            change_dbnote=data['user_dbnote']
-            if len(change_dbnote['removeTags'])>0:
-                sql="delete from relation where user=:user_id and db_note in (:"+",".join(map(str,range(len(change_dbnote['removeTags']))))+")"
-                filter_dict={str(i):change_dbnote['removeTags'][i] for i in range(len(change_dbnote['removeTags']))}
-                filter_dict['user_id']=data['user_id']
-                self.super._helper.delete('relation',special_sql=sql,filter_dict=filter_dict)
-            if len(change_dbnote['addTags'])>0:
-                sql="insert into relation (user,db_note) values (:user_id,:db_note)"
-                dicts=[{'user_id':data['user_id'],"db_note":i} for i in change_dbnote['addTags']]
-                self.super._helper.insert('relation',special_sql=sql,dicts=dicts)
+        user_info={i:data['user_info'][i] for i in data['user_info'] if i in ['name','password','mail']}
+        if len(user_info)>0:
+            if data['user_id']:user_info['user_id']=data['user_id']
+            sql="insert or ignore into users("+','.join(user_info)+') values (:'+',:'.join(user_info)+')'
+            self.super._helper.insert('users',dicts=user_info,special_sql=sql)
+            self.super._helper.update('users',user_info,filter_dict={'user_id':data['user_id']})
+        change_dbnote=data['user_dbnote']
+        if len(change_dbnote['removeTags'])>0:
+            sql="delete from relation where user=:user_id and db_note in (:"+",".join(map(str,range(len(change_dbnote['removeTags']))))+")"
+            filter_dict={str(i):change_dbnote['removeTags'][i] for i in range(len(change_dbnote['removeTags']))}
+            filter_dict['user_id']=data['user_id']
+            self.super._helper.delete('relation',special_sql=sql,filter_dict=filter_dict)
+        if len(change_dbnote['addTags'])>0:
+            sql="insert into relation (user,db_note) values (:user_id,:db_note)"
+            dicts=[{'user_id':data['user_id'],"db_note":i} for i in change_dbnote['addTags']]
+            self.super._helper.insert('relation',special_sql=sql,dicts=dicts)
+        self.super.xml_helper.change_user(data)
     
     def user_remove(self,data):
             self.super._helper.delete('relation',{'user':data['user_id']})
@@ -215,8 +219,25 @@ class sqlite_heler:
             self._db.commit()
             print('FtpManager:数据库初始化完毕')
         else:
-            self._db=sqlite3.connect(self._directory+'\\ftpmanager.db')
-
+            self._db=sqlite3.connect(self._directory+'\\ftpmanager.db',check_same_thread=False,detect_types=sqlite3.PARSE_DECLTYPES)
+    @staticmethod
+    def _warp(data,cursor_description):
+        column=[i[0] for i in cursor_description]
+        if not data:return None
+        if isinstance(data,tuple):
+            return dict(zip(column,data))
+        else:
+            return list(map(lambda x:dict(zip(column,x)),data))
+    def search(self,table,filter_dict={},column_filter=None,fetchlimit=0,special_sql=None):
+        cursor = self._db.cursor()
+        sql = special_sql or f'select {column_filter or "*"} from {table}'
+        if len(filter_dict) and not special_sql:
+            sql+=' where '
+            sql+=' and '.join([i+'=:'+i for i in filter_dict.keys()])
+        cursor.execute(sql,filter_dict)
+        if fetchlimit<0:return self._warp(cursor.fetchall(),cursor.description)
+        elif fetchlimit==0:return self._warp(cursor.fetchone(),cursor.description)
+        else: return self._warp(cursor.fetchmany(fetchlimit),cursor.description)
     def insert(self,table,dicts,special_sql=None):
         cursor=self._db.cursor()
         if isinstance(dicts,dict):
@@ -247,6 +268,60 @@ class sqlite_heler:
         cursor=self._db.cursor()
         cursor.execute(f'select index_id from times where name=:name',{'name':name})
         return cursor.fetchone()[0]
+
+class xml_helper:
+    ServerBaseDir=r'D:\ftp_test'#空文件夹
+    BaseXML=f'<FileZillaServer><Groups><Group Name="BaseGroup"><Option Name="Bypass server userlimit">0</Option><Option Name="User Limit">0</Option><Option Name="IP Limit">0</Option><Option Name="Enabled">1</Option><Option Name="Comments"></Option><Option Name="ForceSsl">0</Option><Permissions><Permission Dir="{ServerBaseDir}"></Permission></Permissions></Group></Groups><Users></Users></FileZillaServer>'
+    DefaultUser='<User><Option Name="Pass"></Option><Option Name="Group">BaseGroup</Option><Option Name="Bypass server userlimit">0</Option><Option Name="User Limit">0</Option><Option Name="IP Limit">0</Option><Option Name="Enabled">1</Option><Option Name="Comments"></Option><Option Name="ForceSsl">0</Option><Permissions></Permissions></User>'
+    ServerBaseDirAttr={'FileRead':0,'FileWrite':0,'FileDelete':0,'FileAppend':0,'DirCreate':0,'DirDelete':0,'DirList':1,'DirSubdirs':1,'IsHome':1}
+    def __init__(self,path,super_class):
+        if not os.path.isfile(path):
+            self.new_init(path)
+        self.path=path
+        self.super=super_class
+        self.xml=ET.parse(path)
+        self.root=self.xml.getroot()
+        self.Users=self.root.find('Users')
+    def new_init(self,path):
+        base=ET.fromstring(self.BaseXML)
+        basePermission=base.find('./Groups/Group/Permissions/Permission')
+        for i in self.ServerBaseDirAttr:
+            temp=ET.SubElement(basePermission,'Option',{'Name':i})
+            temp.text=str(self.ServerBaseDirAttr[i])
+        ET.ElementTree(base).write(path)
+        return
+    def change_user(self,data):
+        user=self.Users.find('./User[@user_id="'+str(data['user_id'])+'"]')
+        if not user:
+            user=ET.fromstring(self.DefaultUser)
+            user.set('Name',data['user_info']['name'])
+            user.set('user_id',str(data['user_id']))
+            user.find('./Option[@Name="Pass"]').text=hashlib.md5(data['user_info']['password'].encode()).hexdigest()
+            self.Users.append(user)
+        user_info={i:data['user_info'][i] for i in data['user_info'] if i in ['name','password']}
+        if len(user_info)>0:
+            for i in user_info:
+                if i=='name':user.set('Name',user_info['name'])
+                if i=='password':user.find('./Option[@Name="Pass"]').text=hashlib.md5(user_info['password'].encode()).hexdigest()
+        if len(data['user_dbnote']['removeTags'])>0:
+            for i in data['user_dbnote']['removeTags']:
+                dbnote=user.find(f'./Permissions/Permission[@id="{i}"]')
+                if dbnote:user.remove(dbnote)
+        if len(data['user_dbnote']['addTags'])>0:
+            user_permissions=user.find('Permissions')
+            result=self.super._helper.search('db_note',special_sql=f'select * from db_note where id in ({",".join(map(str,data["user_dbnote"]["addTags"]))})',fetchlimit=-1)
+            for i in result:
+                user_permission=ET.SubElement(user_permissions,'Permission',{'Dir':i['more']['path'],'id':str(i['id'])})
+                basePermissions=['FileRead','FileRead','FileWrite','FileDelete','FileAppend','DirCreate','DirDelete','DirList','DirSubdirs','IsHome','AutoCreate']
+                for j in i['more']['permissions']:
+                    if j in basePermissions:
+                        basePermissions.remove(j)
+                        temp=ET.SubElement(user_permission,'Option',{'Name':j})
+                        temp.text='1'
+                for j in basePermissions:
+                    temp=ET.SubElement(user_permission,'Option',{'Name':j})
+                    temp.text='0'
+        self.xml.write(self.path)
 
 async def Timer():
     loop=asyncio.get_event_loop()
