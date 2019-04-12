@@ -8,7 +8,7 @@ co={
     'ws_address':'http://127.0.0.1:8123/ftpmanager/ws_keep',
     'ws_confirm':'http://127.0.0.1:8123/ftpmanager/ws_confirm'}
 import uuid,hashlib
-import sqlite3,os,json
+import sqlite3,os,json,copy
 import xml.etree.ElementTree as ET
 
 SRC=hashlib.md5(uuid.UUID(int = uuid.getnode()).hex[-12:].encode()).hexdigest()
@@ -22,7 +22,7 @@ class ftpmanager:
         self.ftpmanager_tools=ftpmanager_tools(self)
         self._helper=sqlite_heler()
         self.loop=loop or asyncio.get_event_loop()
-        self.xml_helper=xml_helper(os.path.split(os.path.realpath(__file__))[0]+'\\Filezilla Server.xml',self)
+        self.xml_helper=xml_helper(os.path.split(os.path.realpath(__file__))[0]+'\\Filezilla Server.xml','',self)
         return
     async def connect(self):
         connect_session = aiohttp.ClientSession()
@@ -152,8 +152,11 @@ class ftpmanager_tools:
         for i in result:
             if i['operation']=='user_change':
                 self.user_change(i['data'])
+                self.super.xml_helper.user_change(i['data'])
             elif i['operation']=='user_remove':
                 self.user_remove(i['data'])
+                self.super.xml_helper.user_remove(i['data'])
+        self.super.xml_helper.apply()
         self.super._helper.update('times',{'index_id':result[-1]['id']},{'name':'operation'})
     
     async def async_dbnotes(self):
@@ -163,9 +166,12 @@ class ftpmanager_tools:
         for i in result:
             if i['operation']=='dbnote_change':
                 self.dbnote_change(i['data'])
+                self.super.xml_helper.dbnote_change(i['data'])
             elif i['operation']=='dbnote_remove':
                 #self.dbnote_remove(i['data'])
+                #self.super.xml_helper.dbnote_remove(i['data'])
                 pass
+        self.super.xml_helper.apply()
         self.super._helper.update('times',{'index_id':result[-1]['id']},{'name':'dbnotes'})
 
     def user_change(self,data):
@@ -185,17 +191,16 @@ class ftpmanager_tools:
             sql="insert into relation (user,db_note) values (:user_id,:db_note)"
             dicts=[{'user_id':data['user_id'],"db_note":i} for i in change_dbnote['addTags']]
             self.super._helper.insert('relation',special_sql=sql,dicts=dicts)
-        self.super.xml_helper.change_user(data)
     
     def user_remove(self,data):
-            self.super._helper.delete('relation',{'user':data['user_id']})
-            self.super._helper.delete('users',{'user_id':data['user_id']})
+        self.super._helper.delete('relation',{'user':data['user_id']})
+        self.super._helper.delete('users',{'user_id':data['user_id']})
     
     def dbnote_change(self,data):
-            filter_dict={'server_id':data['server_id'],'name':data['name'],'more':{'path':data['path'],'permissions':data['permissions'],'more_config':data['more_config']}}
-            if data['id']:filter_dict['id']=data['id']
-            sql="insert or replace into db_note("+','.join(filter_dict)+") values(:"+',:'.join(filter_dict)+")"
-            self.super._helper.insert('user',filter_dict,special_sql=sql)
+        filter_dict={'server_id':data['server_id'],'name':data['name'],'more':{'path':data['path'],'permissions':data['permissions'],'more_config':data['more_config']}}
+        if data['id']:filter_dict['id']=data['id']
+        sql="insert or replace into db_note("+','.join(filter_dict)+") values(:"+',:'.join(filter_dict)+")"
+        self.super._helper.insert('user',filter_dict,special_sql=sql)
 
 class sqlite_heler:
     def __init__(self):
@@ -274,23 +279,28 @@ class xml_helper:
     BaseXML=f'<FileZillaServer><Groups><Group Name="BaseGroup"><Option Name="Bypass server userlimit">0</Option><Option Name="User Limit">0</Option><Option Name="IP Limit">0</Option><Option Name="Enabled">1</Option><Option Name="Comments"></Option><Option Name="ForceSsl">0</Option><Permissions><Permission Dir="{ServerBaseDir}"></Permission></Permissions></Group></Groups><Users></Users></FileZillaServer>'
     DefaultUser='<User><Option Name="Pass"></Option><Option Name="Group">BaseGroup</Option><Option Name="Bypass server userlimit">0</Option><Option Name="User Limit">0</Option><Option Name="IP Limit">0</Option><Option Name="Enabled">1</Option><Option Name="Comments"></Option><Option Name="ForceSsl">0</Option><Permissions></Permissions></User>'
     ServerBaseDirAttr={'FileRead':0,'FileWrite':0,'FileDelete':0,'FileAppend':0,'DirCreate':0,'DirDelete':0,'DirList':1,'DirSubdirs':1,'IsHome':1}
-    def __init__(self,path,super_class):
-        if not os.path.isfile(path):
-            self.new_init(path)
-        self.path=path
+    baseOptions=['FileRead','FileWrite','FileDelete','FileAppend','DirCreate','DirDelete','DirList','DirSubdirs','IsHome','AutoCreate']
+    def __init__(self,xml_path,exe_path,super_class):
+        if not os.path.isfile(xml_path):
+            self.new_init(xml_path)
+        self.xml_path=xml_path
+        self.exe_path=exe_path
         self.super=super_class
-        self.xml=ET.parse(path)
+        self.xml=ET.parse(xml_path)
         self.root=self.xml.getroot()
         self.Users=self.root.find('Users')
-    def new_init(self,path):
+    def new_init(self,xml_path):
         base=ET.fromstring(self.BaseXML)
         basePermission=base.find('./Groups/Group/Permissions/Permission')
         for i in self.ServerBaseDirAttr:
             temp=ET.SubElement(basePermission,'Option',{'Name':i})
             temp.text=str(self.ServerBaseDirAttr[i])
-        ET.ElementTree(base).write(path)
+        ET.ElementTree(base).write(xml_path)
         return
-    def change_user(self,data):
+    def apply(self):
+        self.xml.write(self.xml_path)
+        #os.system(f'"{self.exe_path}" /reload-config')
+    def user_change(self,data):
         user=self.Users.find('./User[@user_id="'+str(data['user_id'])+'"]')
         if not user:
             user=ET.fromstring(self.DefaultUser)
@@ -312,17 +322,36 @@ class xml_helper:
             result=self.super._helper.search('db_note',special_sql=f'select * from db_note where id in ({",".join(map(str,data["user_dbnote"]["addTags"]))})',fetchlimit=-1)
             for i in result:
                 user_permission=ET.SubElement(user_permissions,'Permission',{'Dir':i['more']['path'],'id':str(i['id'])})
-                basePermissions=['FileRead','FileRead','FileWrite','FileDelete','FileAppend','DirCreate','DirDelete','DirList','DirSubdirs','IsHome','AutoCreate']
+                baseOptions=copy.deepcopy(self.baseOptions)
+                ET.SubElement(ET.SubElement(user_permission,'Aliases'),'Alias').text='/'+i['name']
                 for j in i['more']['permissions']:
-                    if j in basePermissions:
-                        basePermissions.remove(j)
+                    if j in baseOptions:
+                        baseOptions.remove(j)
                         temp=ET.SubElement(user_permission,'Option',{'Name':j})
                         temp.text='1'
-                for j in basePermissions:
+                for j in baseOptions:
                     temp=ET.SubElement(user_permission,'Option',{'Name':j})
                     temp.text='0'
-        self.xml.write(self.path)
-
+    def user_remove(self,data):
+        user=self.Users.find('./User[@user_id='+str(data['user_id'])+']')
+        if user:self.Users.remove(user)
+    def dbnote_change(self,data):
+        if not data['id']:return
+        permissions=self.Users.findAll('.//Permission[@id="'+str(data['id'])+'"]')
+        baseOptions=copy.deepcopy(self.baseOptions)
+        for i in data['permissions']:baseOptions.remove(i)
+        for i in permissions:
+            i.set('Dir',data['path'])
+            for j in data['permissions']:
+                temp=i.find('Option[@Name="'+j+'"]')
+                temp.text='1'
+            for j in baseOptions:
+                temp=i.find('Option[@Name="'+j+'"]')
+                temp.text='0'
+    def dbnote_remove(self,data):
+        users=self.Users.findAll('.//Permission[@id="'+str(data['id'])+'"]/..')
+        for i in users:
+            users.remove(i.find('./Permission[@id="'+str(data['id'])+'"]/..'))
 async def Timer():
     loop=asyncio.get_event_loop()
     while True:
