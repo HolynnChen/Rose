@@ -4,12 +4,16 @@ import psutil
 import async_timeout
 #import configloader as co
 from threading import Thread
-co={
-    'ws_address':'http://127.0.0.1:8123/ftpmanager/ws_keep',
-    'ws_confirm':'http://127.0.0.1:8123/ftpmanager/ws_confirm'}
 import uuid,hashlib
 import sqlite3,os,json,copy
 import xml.etree.ElementTree as ET
+co={
+    'ws_address':'http://127.0.0.1:8123/ftpmanager/ws_keep',
+    'ws_confirm':'http://127.0.0.1:8123/ftpmanager/ws_confirm',
+    'xml_path':os.path.split(os.path.realpath(__file__))[0]+'\\Filezilla Server.xml',
+    'exe_path':'',
+    'base_dir':r'D:\ftp_test',
+}
 
 SRC=hashlib.md5(uuid.UUID(int = uuid.getnode()).hex[-12:].encode()).hexdigest()
 APP_KEY='1234567890'
@@ -22,7 +26,7 @@ class ftpmanager:
         self.ftpmanager_tools=ftpmanager_tools(self)
         self._helper=sqlite_heler()
         self.loop=loop or asyncio.get_event_loop()
-        self.xml_helper=xml_helper(os.path.split(os.path.realpath(__file__))[0]+'\\Filezilla Server.xml','',self)
+        self.xml_helper=xml_helper(co['xml_path'],co['exe_path'],self)
         return
     async def connect(self):
         connect_session = aiohttp.ClientSession()
@@ -143,7 +147,7 @@ class ftpmanager_tools:
         self.super=super_class
     @staticmethod
     def get_disk_info():
-        return {i:psutil.disk_usage(i) for i in [j.device for j in psutil.disk_partitions()]}
+        return {i:psutil.disk_usage(i) for i in [j.device for j in psutil.disk_partitions() if j.fstype]}
     
     async def async_operation(self):
         key=await self.super.ws_tool.send({'target':'async_operation','parameters':{'index_id':self.super._helper.get_id('operation')}})
@@ -275,7 +279,7 @@ class sqlite_heler:
         return cursor.fetchone()[0]
 
 class xml_helper:
-    ServerBaseDir=r'D:\ftp_test'#空文件夹
+    ServerBaseDir=co['base_dir']#空文件夹
     BaseXML=f'<FileZillaServer><Groups><Group Name="BaseGroup"><Option Name="Bypass server userlimit">0</Option><Option Name="User Limit">0</Option><Option Name="IP Limit">0</Option><Option Name="Enabled">1</Option><Option Name="Comments"></Option><Option Name="ForceSsl">0</Option><Permissions><Permission Dir="{ServerBaseDir}"></Permission></Permissions></Group></Groups><Users></Users></FileZillaServer>'
     DefaultUser='<User><Option Name="Pass"></Option><Option Name="Group">BaseGroup</Option><Option Name="Bypass server userlimit">0</Option><Option Name="User Limit">0</Option><Option Name="IP Limit">0</Option><Option Name="Enabled">1</Option><Option Name="Comments"></Option><Option Name="ForceSsl">0</Option><Permissions></Permissions></User>'
     ServerBaseDirAttr={'FileRead':0,'FileWrite':0,'FileDelete':0,'FileAppend':0,'DirCreate':0,'DirDelete':0,'DirList':1,'DirSubdirs':1,'IsHome':1}
@@ -316,7 +320,7 @@ class xml_helper:
         if len(data['user_dbnote']['removeTags'])>0:
             for i in data['user_dbnote']['removeTags']:
                 dbnote=user.find(f'./Permissions/Permission[@id="{i}"]')
-                if dbnote:user.remove(dbnote)
+                if dbnote:user.find('./Permissions').remove(dbnote)
         if len(data['user_dbnote']['addTags'])>0:
             user_permissions=user.find('Permissions')
             result=self.super._helper.search('db_note',special_sql=f'select * from db_note where id in ({",".join(map(str,data["user_dbnote"]["addTags"]))})',fetchlimit=-1)
@@ -337,7 +341,7 @@ class xml_helper:
         if user:self.Users.remove(user)
     def dbnote_change(self,data):
         if not data['id']:return
-        permissions=self.Users.findAll('.//Permission[@id="'+str(data['id'])+'"]')
+        permissions=self.Users.findall('.//Permission[@id="'+str(data['id'])+'"]')
         baseOptions=copy.deepcopy(self.baseOptions)
         for i in data['permissions']:baseOptions.remove(i)
         for i in permissions:
@@ -349,9 +353,9 @@ class xml_helper:
                 temp=i.find('Option[@Name="'+j+'"]')
                 temp.text='0'
     def dbnote_remove(self,data):
-        users=self.Users.findAll('.//Permission[@id="'+str(data['id'])+'"]/..')
+        users=self.Users.findall('.//Permission[@id="'+str(data['id'])+'"]/..')
         for i in users:
-            users.remove(i.find('./Permission[@id="'+str(data['id'])+'"]/..'))
+            users.find('./Permissions').remove(i.find('./Permission[@id="'+str(data['id'])+'"]/..'))
 async def Timer():
     loop=asyncio.get_event_loop()
     while True:

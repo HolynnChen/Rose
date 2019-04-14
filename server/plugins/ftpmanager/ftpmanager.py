@@ -96,6 +96,13 @@ class ftpmanager:
             return web.json_response({'code':302,'redirect':'/ftpmanager/index'})
         else:
             return web.json_response({'code':10001,'msg':'账号或密码错误'})
+    async def logout_get(self,request):
+        session=await get_session(request)
+        uid=session.get('uid')
+        if not uid:return web.HTTPFound('/ftpmanager/login')
+        del session['uid']
+        del self._user_table[uid]
+        return web.HTTPFound('/ftpmanager/login')
         
     async def test_get(self,request):
         ss=await self._wst.send_all({'type':'ftpmanager_tools','cmd':'get_disk_info'})

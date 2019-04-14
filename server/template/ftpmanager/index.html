@@ -10,7 +10,7 @@
     <script src="https://cdn.bootcss.com/element-ui/2.5.4/index.js"></script>
     <script type="text/javascript" src="/static/ftpmanager/js/main.js"></script>
     <meta charset="UTF-8">
-    <title>Ftpmanager管理页面</title>
+    <title>FtpManager管理页面</title>
 </head>
 
 <body>
@@ -29,6 +29,10 @@
                     <el-menu-item index="2">
                         <i class="el-icon- iconfont icon-user"></i>
                         <span slot="title">用户管理</span>
+                    </el-menu-item>
+                    <el-menu-item index="3">
+                        <i class="el-icon- iconfont icon-key"></i>
+                        <span slot="title">退出系统</span>
                     </el-menu-item>
                     <el-menu-item index="9" @click="menu_toggle">
                         <i :class="{'el-icon-caret-bottom':menu.isCollapse,'el-icon-caret-top':!menu.isCollapse}"></i>
@@ -261,7 +265,7 @@
                 },
                 app: {
                     connect:true,
-                    checkbox_group_value:{'FileRead':'文件读取','FileWrite':'文件写入','FileDelete':'文件删除','DirCerate':'创建目录','DirList':'列出目录','DirSubdirs':'列出子目录'},
+                    checkbox_group_value:{'FileRead':'文件读取','FileWrite':'文件写入','FileDelete':'文件删除','DirCreate':'创建目录','DirList':'列出目录','DirSubdirs':'列出子目录'},
                     page:1,
                     index: {
                         servers: [],
@@ -314,6 +318,14 @@
             },
             methods: {
                 change_page:function(key,keypath){
+                    if(key==3){
+                        self.$confirm('确认退出？', '警告', {
+                            confirmButtonText: '确定',
+                            cancelButtonText: '取消',
+                            type: 'warning'
+                        }).then(_=>window.location.href='/ftpmanager/logout')
+                        return
+                    }
                     if(key<9)this.app.page=key;
                 },
                 menu_toggle: function () {
