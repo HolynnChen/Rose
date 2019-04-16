@@ -21,6 +21,8 @@ $RECYCLE.BIN/
 .*
 *.pyc
 *.db
+build
+dist
 # =========================
 # Operating System Files
 # =========================

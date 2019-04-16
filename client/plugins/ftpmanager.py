@@ -358,7 +358,7 @@ class xml_helper:
             for j in baseOptions:
                 temp=i.find('Option[@Name="'+j+'"]')
                 temp.text='0'
-            i.find('.//Alias').text=data['name']
+            i.find('.//Alias').text='/'+data['name']
     def dbnote_remove(self,data):
         users=self.Users.findall('.//Permission[@id="'+str(data['id'])+'"]/..')
         for i in users:
