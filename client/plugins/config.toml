@@ -1,0 +1,7 @@
+[ftpmanager]
+ws_address = 'http://127.0.0.1:8123/ftpmanager/ws_keep'
+ws_confirm = 'http://127.0.0.1:8123/ftpmanager/ws_confirm'
+xml_path = 'Filezilla Server.xml'
+exe_path = ''
+base_dir = 'D:\ftp_test'
+APP_KEY = '1234567890'

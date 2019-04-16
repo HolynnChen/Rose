@@ -2,21 +2,14 @@ import asyncio,sys
 import aiohttp
 import psutil
 import async_timeout
-#import configloader as co
 from threading import Thread
-import uuid,hashlib
+import uuid,hashlib,toml
 import sqlite3,os,json,copy
 import xml.etree.ElementTree as ET
-co={
-    'ws_address':'http://127.0.0.1:8123/ftpmanager/ws_keep',
-    'ws_confirm':'http://127.0.0.1:8123/ftpmanager/ws_confirm',
-    'xml_path':os.path.split(os.path.realpath(__file__))[0]+'\\Filezilla Server.xml',
-    'exe_path':'',
-    'base_dir':r'D:\ftp_test',
-}
-
+print('FtpManager初始化中')
+co=toml.load(os.path.split(os.path.realpath(__file__))[0]+'\\config.toml')['ftpmanager']
 SRC=hashlib.md5(uuid.UUID(int = uuid.getnode()).hex[-12:].encode()).hexdigest()
-APP_KEY='1234567890'
+APP_KEY=co['APP_KEY']
 NAME=hashlib.sha256((SRC+APP_KEY).encode()).hexdigest()
 var={}
 def expect(data,target):return all([i in data for i in target])
@@ -27,6 +20,7 @@ class ftpmanager:
         self._helper=sqlite_heler()
         self.loop=loop or asyncio.get_event_loop()
         self.xml_helper=xml_helper(co['xml_path'],co['exe_path'],self)
+        print('FtpManager:已初始化')
         return
     async def connect(self):
         connect_session = aiohttp.ClientSession()
@@ -37,20 +31,21 @@ class ftpmanager:
             return
         ws = await connect_session.ws_connect(co['ws_address'],heartbeat=30, receive_timeout=60,headers={'cookie':str(resp.cookies).split(':')[1]})
         self.ws_tool=ws_tool(ws,loop=loop)
+        print('FtpManager:已连接服务器 '+co['ws_confirm'])
         try:
             await self.ws_tool.send({'target':'update_info','parameters':{'server_id':NAME,'disk_info':self.ftpmanager_tools.get_disk_info()}})
             async for msg in ws:
                 if msg.type == aiohttp.WSMsgType.CLOSED:
-                    print('收到关闭信息')
+                    print('FtpManager:收到关闭信息')
                     await ws.close()
                     break
                 elif msg.type == aiohttp.WSMsgType.ERROR:
-                    print('收到异常信息')
+                    print('FtpManager:收到异常信息')
                     break
                 try:
                     resp=msg.json()
                     if not expect(resp,['data','uuid']):
-                        print('服务端发来不支持的信息',resp)
+                        print('FtpManager:服务端发来不支持的信息',resp)
                         continue
                     if expect(resp['data'],['type','cmd']):
                         todo=resp['data']
@@ -69,10 +64,10 @@ class ftpmanager:
                 except:
                     continue
         except asyncio.CancelledError:
-           print('服务器已离线')
+           print('FtpManager:服务器已离线')
            return ws
         except:
-           print('服务器意外离线')
+           print('FtpManager:服务器意外离线')
            return ws
         return
 
@@ -162,6 +157,7 @@ class ftpmanager_tools:
                 self.super.xml_helper.user_remove(i['data'])
         self.super.xml_helper.apply()
         self.super._helper.update('times',{'index_id':result[-1]['id']},{'name':'operation'})
+        print('FtpManager:操作同步 id:'+str(result[-1]['id']))
     
     async def async_dbnotes(self):
         key=await self.super.ws_tool.send({'target':'async_dbnotes','parameters':{'index_id':self.super._helper.get_id('dbnotes'),'server_id':NAME}})
@@ -177,6 +173,7 @@ class ftpmanager_tools:
                 pass
         self.super.xml_helper.apply()
         self.super._helper.update('times',{'index_id':result[-1]['id']},{'name':'dbnotes'})
+        print('FtpManager:标签同步 id:'+str(result[-1]['id']))
 
     def user_change(self,data):
         user_info={i:data['user_info'][i] for i in data['user_info'] if i in ['name','password','mail']}
@@ -229,6 +226,7 @@ class sqlite_heler:
             print('FtpManager:数据库初始化完毕')
         else:
             self._db=sqlite3.connect(self._directory+'\\ftpmanager.db',check_same_thread=False,detect_types=sqlite3.PARSE_DECLTYPES)
+        print('FtpManager:数据库已连接')
     @staticmethod
     def _warp(data,cursor_description):
         column=[i[0] for i in cursor_description]
@@ -303,7 +301,7 @@ class xml_helper:
         return
     def apply(self):
         self.xml.write(self.xml_path)
-        #os.system(f'"{self.exe_path}" /reload-config')
+        os.system(f'"{self.exe_path}" /reload-config')
     def user_change(self,data):
         user=self.Users.find('./User[@user_id="'+str(data['user_id'])+'"]')
         if not user:
