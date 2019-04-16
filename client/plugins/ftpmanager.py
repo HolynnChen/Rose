@@ -168,12 +168,16 @@ class ftpmanager_tools:
                 self.dbnote_change(i['data'])
                 self.super.xml_helper.dbnote_change(i['data'])
             elif i['operation']=='dbnote_remove':
-                #self.dbnote_remove(i['data'])
-                #self.super.xml_helper.dbnote_remove(i['data'])
+                self.dbnote_remove(i['data'])
+                self.super.xml_helper.dbnote_remove(i['data'])
                 pass
         self.super.xml_helper.apply()
         self.super._helper.update('times',{'index_id':result[-1]['id']},{'name':'dbnotes'})
         print('FtpManager:标签同步 id:'+str(result[-1]['id']))
+    
+    async def async_all(self):
+        await self.async_dbnotes()
+        await self.async_operation()
 
     def user_change(self,data):
         user_info={i:data['user_info'][i] for i in data['user_info'] if i in ['name','password','mail']}
@@ -202,6 +206,9 @@ class ftpmanager_tools:
         if data['id']:filter_dict['id']=data['id']
         sql="insert or replace into db_note("+','.join(filter_dict)+") values(:"+',:'.join(filter_dict)+")"
         self.super._helper.insert('user',filter_dict,special_sql=sql)
+    
+    def dbnote_remove(self,data):
+        self.super._helper.delete('db_note',{'id':data['id']})
 
 class sqlite_heler:
     def __init__(self):
@@ -341,6 +348,7 @@ class xml_helper:
         if not data['id']:return
         permissions=self.Users.findall('.//Permission[@id="'+str(data['id'])+'"]')
         baseOptions=copy.deepcopy(self.baseOptions)
+        if not permissions:return
         for i in data['permissions']:baseOptions.remove(i)
         for i in permissions:
             i.set('Dir',data['path'])
@@ -350,6 +358,7 @@ class xml_helper:
             for j in baseOptions:
                 temp=i.find('Option[@Name="'+j+'"]')
                 temp.text='0'
+            i.find('.//Alias').text=data['name']
     def dbnote_remove(self,data):
         users=self.Users.findall('.//Permission[@id="'+str(data['id'])+'"]/..')
         for i in users:

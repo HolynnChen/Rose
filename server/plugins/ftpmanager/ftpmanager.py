@@ -275,8 +275,7 @@ class ftpmanager:
         self._server_table[server_id]=self._helper.search('server',{'server_id':server_id})
         try:
             print('online',server_id)
-            asyncio.ensure_future(self._wst.async_operation(key=server_id))
-            asyncio.ensure_future(self._wst.async_dbnotes(key=server_id))
+            asyncio.ensure_future(self._wst.async_all(key=server_id))
             async for msg in ws:
                 json = msg.json()
                 if expect(json,['data','uuid']):
@@ -476,6 +475,10 @@ class ws_tool:
 
     async def async_dbnotes(self,key=None):
         data={'type':'ftpmanager_tools','cmd':'async_dbnotes'}
+        if not key:await self.send_all(data)
+        else:await self.send(key,data)
+    async def async_all(self,key=None):
+        data={'type':'ftpmanager_tools','cmd':'async_all'}
         if not key:await self.send_all(data)
         else:await self.send(key,data)
     

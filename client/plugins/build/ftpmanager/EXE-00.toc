@@ -121,7 +121,7 @@
  [],
  False,
  False,
- 1555305044,
+ 1555413278,
  [('run.exe',
    'c:\\users\\mechrev\\appdata\\local\\programs\\python\\python36\\lib\\site-packages\\PyInstaller\\bootloader\\Windows-64bit\\run.exe',
    'EXECUTABLE')])
