@@ -297,12 +297,14 @@ class ftpmanager:
         except asyncio.CancelledError:
             self._server_table[server_id]['status']=0
             self._helper.change_server_status(server_id,0)
+            await self._wst.remove(server_id)
             print('offline', server_id)
             return ws
         except Exception as e:
             print(e)
             self._server_table[server_id]['status']=2
             self._helper.change_server_status(server_id,2)
+            await self._wst.remove(server_id)
             print('error', server_id)
             return ws
 
@@ -444,6 +446,9 @@ class ws_tool:
     ws_msg_dict=gb.async_Dict()
     def __init__(self):self.wss={}
     def add(self,key,ws):self.wss[key]=ws
+    async def remove(self,key):
+        await self.wss[key].close()
+        del self.wss[key]
     def server_id_list(self):return list(self.wss.keys())
     async def send(self,key,json,s=None):
         s=s or uuid.uuid1().hex
