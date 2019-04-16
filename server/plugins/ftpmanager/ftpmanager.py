@@ -39,6 +39,7 @@ def manager_required(func):  # 用户登录状态校验
     return inner
 
 def expect(data,target):return all([i in data for i in target])
+def asyncfunc(func):return lambda *args,**kwargs:asyncio.get_event_loop().run_in_executor(None,lambda:func(*args,**kwargs))
 
 async def sorted_wait(tasks):
     async def index(i,task):
@@ -66,8 +67,6 @@ class ftpmanager:
         gb.var['app.on_shutdown'].append(self._wst.close())
         print('FtpManager模块已启用')
         self._server_table=self._helper.get_server_list() or {}
-        for i in self._server_table:
-            self._server_table[i]['more']=self._server_table[i]['more']
 
     async def default_get(self,request):
         return await self.index_get(request)
@@ -87,7 +86,7 @@ class ftpmanager:
     async def login_post(self,request):
         data = await request.post()
         if not expect(data,['username','password']):return web.json_response({'code':-1,'err_msg':'参数不完整'})
-        user=self._helper.check_manager(data['username'],data['password'])
+        user=await self._helper.check_manager(data['username'],data['password'])
         if user:
             self._user_table[user['id']]=user
             session = await get_session(request)
@@ -125,7 +124,7 @@ class ftpmanager:
                 name=str(data['data'])
                 if len(name)<3 or len(name)>15:return web.json_response({'code':-1,'err_msg':'参数错误'})
                 self.super._server_table[data['server_id']]['name']=name
-                self.super._helper.update('server',{'name':name},{'server_id':data['server_id']})
+                await self.super._helper.update('server',{'name':name},{'server_id':data['server_id']})
             return web.json_response({'code':0,'msg':'success'})
         @manager_required
         async def del_server_post(self,request):
@@ -134,20 +133,20 @@ class ftpmanager:
             if not data['server_id'] in self.super._server_table:return web.json_response({'code':-1,'err_msg':'参数错误'})
             if self.super._server_table[data['server_id']]['status']==1:return web.json_response({'code':-1,'err_msg':'已连接的服务器不可删除，请尝试断开连接后再进行操作'})
             del self.super._server_table[data['server_id']]
-            self.super._helper.delete('server',{'server_id':data['server_id']})
+            await self.super._helper.delete('server',{'server_id':data['server_id']})
             return web.json_response({'code':0,'msg':'success'})
         
         @manager_required
         async def get_base_user_info_get(self,request):
-            temp=self.super._helper.search('relation',fetchlimit=-1,special_sql="select db_note.server_id, count() as num from relation inner join db_note on relation.db_note=db_note.id group by db_note.server_id") or []
-            return web.json_response({'all':self.super._helper.search('users',column_filter='count() as number')['number'],'servers':{i['server_id']:i['num'] for i in temp}})
+            temp=await self.super._helper.search('relation',fetchlimit=-1,special_sql="select db_note.server_id, count() as num from relation inner join db_note on relation.db_note=db_note.id group by db_note.server_id") or []
+            return web.json_response({'all':(await self.super._helper.search('users',column_filter='count() as number'))['number'],'servers':{i['server_id']:i['num'] for i in temp}})
         
         @manager_required
         async def get_server_notes_post(self,request):
             data=await request.post()
             if not expect(data,['server_id']):return web.json_response({'code':-1,'err_msg':'参数不完整'})
             if not data['server_id'] in self.super._server_table:return web.json_response({'code':-1,'err_msg':'参数错误'})
-            return web.json_response({'code':0,'data':self.super._helper.search('db_note',fetchlimit=-1,filter_dict={'server_id':data['server_id']}) or []})
+            return web.json_response({'code':0,'data':(await self.super._helper.search('db_note',fetchlimit=-1,filter_dict={'server_id':data['server_id']})) or []})
 
         @manager_required
         async def get_users_post(self,request):
@@ -164,15 +163,15 @@ class ftpmanager:
                 want_filt.append("instr(users.name,:user_keyword)>0 or instr(users.mail,:user_keyword)>0")
             if len(want_filt):sql+=' where '+' and '.join(want_filt)
             filter_dict={i:data[i] for i in ['server_id','db_note','user_keyword']}
-            return web.json_response({'code':0,'data':self.super._helper.search('relation',fetchlimit=-1,special_sql=sql,filter_dict=filter_dict) or []})
+            return web.json_response({'code':0,'data':await self.super._helper.search('relation',fetchlimit=-1,special_sql=sql,filter_dict=filter_dict) or []})
         
         @manager_required
         async def get_user_post(self,request):
             data=await request.post()
             if not expect(data,['user_id']):return web.json_response({'code':-1,'err_msg':'参数不完整'})
-            user_info=self.super._helper.search('users',filter_dict={'user_id':data['user_id']},column_filter="name,user_id,mail")
+            user_info=await self.super._helper.search('users',filter_dict={'user_id':data['user_id']},column_filter="name,user_id,mail")
             sql="select db_note.* from relation inner join db_note on relation.db_note=db_note.id where relation.user=:user_id"
-            user_dbnote=self.super._helper.search('db_note',fetchlimit=-1,special_sql=sql,filter_dict={'user_id':data['user_id']})
+            user_dbnote=await self.super._helper.search('db_note',fetchlimit=-1,special_sql=sql,filter_dict={'user_id':data['user_id']})
             return web.json_response({'code':0,'data':{"user_info":user_info,"user_dbnote":user_dbnote}})
 
         @manager_required
@@ -183,32 +182,32 @@ class ftpmanager:
             if len(user_info)>0:
                 if data['user_id']:user_info['user_id']=data['user_id']
                 sql="insert or ignore into users("+','.join(user_info)+') values (:'+',:'.join(user_info)+')'
-                user_id=self.super._helper.insert('users',dicts=user_info,special_sql=sql,get_id=True)
+                user_id=await self.super._helper.insert('users',dicts=user_info,special_sql=sql,get_id=True)
                 if not data['user_id']:data['user_id']=user_id
-                self.super._helper.update('users',user_info,filter_dict={'user_id':data['user_id']})
+                await self.super._helper.update('users',user_info,filter_dict={'user_id':data['user_id']})
             change_dbnote=data['user_dbnote']
             if len(change_dbnote['removeTags'])>0:
                 sql="delete from relation where user=:user_id and db_note in (:"+",".join(map(str,range(len(change_dbnote['removeTags']))))+")"
                 filter_dict={str(i):change_dbnote['removeTags'][i] for i in range(len(change_dbnote['removeTags']))}
                 filter_dict['user_id']=data['user_id']
-                self.super._helper.delete('relation',special_sql=sql,filter_dict=filter_dict)
+                await self.super._helper.delete('relation',special_sql=sql,filter_dict=filter_dict)
             if len(change_dbnote['addTags'])>0:
                 sql="insert into relation (user,db_note) values (:user_id,:db_note)"
                 dicts=[{'user_id':data['user_id'],"db_note":i} for i in change_dbnote['addTags']]
                 try:
-                    self.super._helper.insert('relation',special_sql=sql,dicts=dicts)
+                    await self.super._helper.insert('relation',special_sql=sql,dicts=dicts)
                 except:
                     return web.json_response({'code':-1,'err_msg':'写入异常，即将刷新'})
-            self.super._helper.insert('operation_log',{'operation':'user_change','data':data})
+            await self.super._helper.insert('operation_log',{'operation':'user_change','data':data})
             await self.super._wst.async_operation()
             return web.json_response({'code':0,'msg':'success'})
         @manager_required
         async def user_remove_post(self,request):
             data=await request.post()
             if not expect(data,['user_id']):return web.json_response({'code':-1,'err_msg':'参数不完整'})
-            self.super._helper.delete('relation',{'user':data['user_id']})
-            self.super._helper.delete('users',{'user_id':data['user_id']})
-            self.super._helper.insert('operation_log',{'operation':'user_remove','data':data})
+            await self.super._helper.delete('relation',{'user':data['user_id']})
+            await self.super._helper.delete('users',{'user_id':data['user_id']})
+            await self.super._helper.insert('operation_log',{'operation':'user_remove','data':data})
             await self.super._wst.async_operation()
             return web.json_response({'code':0,'msg':'删除成功'})
 
@@ -225,13 +224,13 @@ class ftpmanager:
             if len(want_filt)>0:
                 sql+=' where '+' and '.join(want_filt)
             filter_dict={i:data[i] for i in ['server_id','dbnote_keyword']}
-            return web.json_response({'code':0,'data':self.super._helper.search('db_note',special_sql=sql,fetchlimit=-1,filter_dict=filter_dict)})
+            return web.json_response({'code':0,'data':await self.super._helper.search('db_note',special_sql=sql,fetchlimit=-1,filter_dict=filter_dict)})
 
         @manager_required
         async def get_dbnote_post(self,request):
             data=await request.post()
             if not expect(data,['id']):return web.json_response({'code':-1,'err_msg':'参数不完整'})
-            result=self.super._helper.search('db_note',filter_dict={'id':data['id']})
+            result=await self.super._helper.search('db_note',filter_dict={'id':data['id']})
             if not result:return web.json_response({'code':-1,'err_msg':'找不到相应标签'})
             result['more']=result.get('more',{})
             result['path']=result['more'].get('path','')
@@ -247,8 +246,8 @@ class ftpmanager:
             filter_dict={'server_id':data['server_id'],'name':data['name'],'more':{'path':data['path'],'permissions':data['permissions'],'more_config':data['more_config']}}
             if data['id']:filter_dict['id']=data['id']
             sql="insert or replace into db_note("+','.join(filter_dict)+") values(:"+',:'.join(filter_dict)+")"
-            self.super._helper.insert('user',filter_dict,special_sql=sql)
-            self.super._helper.insert('dbnote_log',{'server_id':data['server_id'],'operation':'dbnote_change','data':data})
+            await self.super._helper.insert('user',filter_dict,special_sql=sql)
+            await self.super._helper.insert('dbnote_log',{'server_id':data['server_id'],'operation':'dbnote_change','data':data})
             await self.super._wst.async_dbnotes()
             return web.json_response({'code':0,'msg':'success'})
 
@@ -271,8 +270,8 @@ class ftpmanager:
         if not expect(session,['ftpmanager_verify','server_id']) or not session.get('ftpmanager_verify'):return web.Response(status=404,reason='非法登陆')
         server_id=session['server_id']
         self._wst.add(server_id,ws)
-        self._helper.active_server(server_id)
-        self._server_table[server_id]=self._helper.search('server',{'server_id':server_id})
+        await self._helper.active_server(server_id)
+        self._server_table[server_id]=await self._helper.search('server',{'server_id':server_id})
         try:
             print('online',server_id)
             asyncio.ensure_future(self._wst.async_all(key=server_id))
@@ -296,14 +295,14 @@ class ftpmanager:
             return ws
         except asyncio.CancelledError:
             self._server_table[server_id]['status']=0
-            self._helper.change_server_status(server_id,0)
+            await self._helper.change_server_status(server_id,0)
             await self._wst.remove(server_id)
             print('offline', server_id)
             return ws
         except Exception as e:
             print(e)
             self._server_table[server_id]['status']=2
-            self._helper.change_server_status(server_id,2)
+            await self._helper.change_server_status(server_id,2)
             await self._wst.remove(server_id)
             print('error', server_id)
             return ws
@@ -354,24 +353,6 @@ class sqlite_helper:
         cursor.execute(sql,(name,password,mail,permissions))
         self._db.commit()
 
-    def _add_user(self,name,password,mail):
-        cursor = self._db.cursor()
-        sql = f'insert into users (name, password, mail) values (?,?,?,)'
-        cursor.execute(sql, (name, uuid.uuid4().hex, password, mail))
-        self._db.commit()
-
-    def _add_server(self,name,ip,status=0,more={}):
-        cursor = self._db.cursor()
-        sql = 'insert into servers (name, ip, status, more) values (?,?,?,?)'
-        cursor.execute(sql, (name, ip,status,more))
-        self._db.commit()
-
-    def _add_db_note(self,name,server_id,more=''):
-        cursor = self._db.cursor()
-        sql = 'insert into db_note (name, server_id, more) values (?,?,?)'
-        cursor.execute(sql, (name, server_id, more))
-        self._db.commit()
-
     @staticmethod
     def _warp(data,cursor_description):
         column=[i[0] for i in cursor_description]
@@ -381,13 +362,13 @@ class sqlite_helper:
         else:
             return list(map(lambda x:dict(zip(column,x)),data))
 
-
     def get_server_list(self):
         cursor=self._db.cursor()
         sql='select * from server'
         result=self._warp(cursor.execute(sql).fetchall(),cursor.description)
         if not result:return {}
         return {i['server_id']:i for i in result}
+    @asyncfunc
     def search(self,table,filter_dict={},column_filter=None,fetchlimit=0,special_sql=None):
         cursor = self._db.cursor()
         sql = special_sql or f'select {column_filter or "*"} from {table}'
@@ -398,6 +379,7 @@ class sqlite_helper:
         if fetchlimit<0:return self._warp(cursor.fetchall(),cursor.description)
         elif fetchlimit==0:return self._warp(cursor.fetchone(),cursor.description)
         else: return self._warp(cursor.fetchmany(fetchlimit),cursor.description)
+    @asyncfunc
     def insert(self,table,dicts,special_sql=None,get_id=False):
         cursor=self._db.cursor()
         if isinstance(dicts,dict):
@@ -412,6 +394,7 @@ class sqlite_helper:
             self._db.commit()
             return result
         self._db.commit()
+    @asyncfunc
     def update(self,table,value_dict,filter_dict={},special_sql=None):
         cursor = self._db.cursor()
         temp=",".join([i+'=?' for i in value_dict.keys()])
@@ -421,6 +404,7 @@ class sqlite_helper:
             sql+=' and '.join([i+'=?' for i in filter_dict.keys()])
         cursor.execute(sql,tuple(list(value_dict.values())+list(filter_dict.values())))
         self._db.commit()
+    @asyncfunc
     def delete(self,table,filter_dict={},special_sql=None):
         cursor=self._db.cursor()
         sql = special_sql or f'delete from {table}'
@@ -430,16 +414,17 @@ class sqlite_helper:
         cursor.execute(sql,filter_dict)
         self._db.commit()
 
-    def check_manager(self,username,password):
+    async def check_manager(self,username,password):
         key='mail' if re.match(r'^[\w]+[\w._]*@\w+\.[a-zA-Z]+$', username) else 'name'
-        return self.search('manager',{key:username,'password':password})
+        return await self.search('manager',{key:username,'password':password})
     
-    def active_server(self,server_id):
-        if not self.search('server',{'server_id':server_id}):
-            self.insert('server',{'server_id':server_id,'status':1,'name':server_id,'more':{}})
+    async def active_server(self,server_id):
+        if not await self.search('server',{'server_id':server_id}):
+            await self.insert('server',{'server_id':server_id,'status':1,'name':server_id,'more':{}})
             return
-        self.change_server_status(server_id,1)
-    def change_server_status(self,server_id,status):self.update('server',{'status':status},{'server_id':server_id})
+        await self.change_server_status(server_id,1)
+    async def change_server_status(self,server_id,status):
+        await self.update('server',{'status':status},{'server_id':server_id})
 
 class ws_tool:
     wss={}
@@ -491,22 +476,22 @@ class ftp_tools:
     def __init__(self,master,helper):
         self._master=master
         self._helper=helper
-    def update_info(self,params):
+    async def update_info(self,params):
         if expect(params,['server_id','disk_info']) and params['server_id'] in self._master._server_table:
             self._master._server_table[params['server_id']]['more']['disk_info']=params['disk_info']
-            more=self._helper.search('server',{'server_id':params['server_id']})['more']
+            more=await self._helper.search('server',{'server_id':params['server_id']})['more']
             more['disk_info']=params['disk_info']
-            self._helper.update('server',{'more':more},{'server_id':params['server_id']})
+            await self._helper.update('server',{'more':more},{'server_id':params['server_id']})
     
-    def async_operation(self,params):
+    async def async_operation(self,params):
         index_id=params['index_id']
         sql="select * from operation_log where id>:id"
-        return self._helper.search('operation_log',fetchlimit=-1,special_sql=sql,filter_dict={'id':index_id})  or []
+        return await self._helper.search('operation_log',fetchlimit=-1,special_sql=sql,filter_dict={'id':index_id})  or []
     
-    def async_dbnotes(self,params):
+    async def async_dbnotes(self,params):
         server_id,index_id=params['server_id'],params['index_id']
         if server_id not in self._master._server_table:
             return None
         sql=f"select * from dbnote_log where server_id=:server_id and id>:id"
-        return self._helper.search(f'dbnote_log',fetchlimit=-1,special_sql=sql,filter_dict={'server_id':server_id,'id':index_id}) or []
+        return await self._helper.search(f'dbnote_log',fetchlimit=-1,special_sql=sql,filter_dict={'server_id':server_id,'id':index_id}) or []
 
