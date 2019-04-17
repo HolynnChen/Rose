@@ -15,7 +15,7 @@ import uuid,sys,traceback
 import async_timeout
 import threading
 #import pickle
-import json
+import json,concurrent.futures
 
 APP_KEY='1234567890'
 __all__=['ftpmanager']
@@ -39,7 +39,8 @@ def manager_required(func):  # 用户登录状态校验
     return inner
 
 def expect(data,target):return all([i in data for i in target])
-def asyncfunc(func):return lambda *args,**kwargs:asyncio.get_event_loop().run_in_executor(None,lambda:func(*args,**kwargs))
+pool=concurrent.futures.ThreadPoolExecutor(max_workers=5,thread_name_prefix='ftpmanager')
+def asyncfunc(func):return lambda *args,**kwargs:asyncio.get_event_loop().run_in_executor(pool,lambda:func(*args,**kwargs))
 
 async def sorted_wait(tasks):
     async def index(i,task):
