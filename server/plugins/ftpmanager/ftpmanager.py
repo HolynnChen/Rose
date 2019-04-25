@@ -480,19 +480,19 @@ class ftp_tools:
     async def update_info(self,params):
         if expect(params,['server_id','disk_info']) and params['server_id'] in self._master._server_table:
             self._master._server_table[params['server_id']]['more']['disk_info']=params['disk_info']
-            more=await self._helper.search('server',{'server_id':params['server_id']})['more']
+            more=(await self._helper.search('server',{'server_id':params['server_id']}))['more']
             more['disk_info']=params['disk_info']
             await self._helper.update('server',{'more':more},{'server_id':params['server_id']})
     
     async def async_operation(self,params):
         index_id=params['index_id']
         sql="select * from operation_log where id>:id"
-        return await self._helper.search('operation_log',fetchlimit=-1,special_sql=sql,filter_dict={'id':index_id})  or []
+        return (await self._helper.search('operation_log',fetchlimit=-1,special_sql=sql,filter_dict={'id':index_id}))  or []
     
     async def async_dbnotes(self,params):
         server_id,index_id=params['server_id'],params['index_id']
         if server_id not in self._master._server_table:
             return None
         sql=f"select * from dbnote_log where server_id=:server_id and id>:id"
-        return await self._helper.search(f'dbnote_log',fetchlimit=-1,special_sql=sql,filter_dict={'server_id':server_id,'id':index_id}) or []
+        return (await self._helper.search(f'dbnote_log',fetchlimit=-1,special_sql=sql,filter_dict={'server_id':server_id,'id':index_id})) or []
 
