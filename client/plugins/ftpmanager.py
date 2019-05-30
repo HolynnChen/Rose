@@ -305,6 +305,7 @@ class xml_helper:
             temp=ET.SubElement(basePermission,'Option',{'Name':i})
             temp.text=str(self.ServerBaseDirAttr[i])
         ET.ElementTree(base).write(xml_path,encoding="UTF-8")
+        os.system(f'"{self.exe_path}" /reload-config')
         return
     def apply(self):
         self.xml.write(self.xml_path,encoding="UTF-8")

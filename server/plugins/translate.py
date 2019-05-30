@@ -9,7 +9,7 @@ from rose.helper import template
 from aiohttp import web
 
 class Translate:
-    tkk = '429242.2670508838'#'428194.2961085901'
+    tkk = '433119.655591104'#'428194.2961085901'
     base_server = 'https://translate.google.com/'
     base_url = 'translate_a/single?client=webapp&sl=en&tl=zh-CN&hl=zh-CN&dt=at&dt=bd&dt=ex&dt=ld&dt=md&dt=qca&dt=rw&dt=rm&dt=ss&dt=t&source=btn&ssel=0&tsel=0&kc=0&tk='
     headers = {
@@ -116,7 +116,7 @@ class Translate:
         temp_data['i'] = text
         temp_data['salt'] = str(int(time.time() * 1000) + random.randint(1, 10))
         temp_data['sign'] = hashlib.md5(
-            ("fanyideskweb" + text + temp_data['salt'] + "p09@Bn{h02_BIEe]$P^nG").encode('utf-8')).hexdigest()
+            ("fanyideskweb" + text + temp_data['salt'] + "@6f#X3=cCuncYssPsuRUE").encode('utf-8')).hexdigest()
         temp_data = {**self.base_youdao_data, **temp_data}
         return temp_data
 
